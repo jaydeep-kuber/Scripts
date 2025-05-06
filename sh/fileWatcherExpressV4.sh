@@ -204,7 +204,7 @@ exec 2>&1
             # Run dos2unix here to clean up hidden character else the match will fail
             # usersCSV set further up for UTF8 checks
 	    	# usersCSV=${SOURCE_PARENT_DIR}${COMPANY[$index]}/UPLOAD/${prefix}_users.csv
-            if [ -f ${usersCSV} ]
+            if [ -f ${usersCSV} ]	
             then
                 echo ${usersCSV}
 				#${ALLEGO_HOME}/scripts/copyToAUPViewer.sh "${COMPANY[$index]}" "${usersCSV}"

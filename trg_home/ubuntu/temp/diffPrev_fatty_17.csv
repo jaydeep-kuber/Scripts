@@ -1,24 +1,27 @@
+RubyCA,Kennedy,rubyCA.qa@dev,
 John,Doe,jdoe,"mechanic, host"
-Ed 2,Chin,echin2@dev,
-CA,Chalimadugu,sc.ca@dev,
-Yuchun,Lee,ylee@dev,Chief Card Counter
-Nick,Pang,nick@dev,Son
-EdAdmin,Chin,echin.prod@dev,-
-Ed 陈,Chin,echin.qa@dev,-
-Ruby2,Kennedy,ruby2@dev,Ruby test user #2
-Hokkun,1031\,hokkun.qa@dev,-
-Ruby,Kennedy,ruby@dev,
-Prince,,prince@dev,
-Dave,Cheung,dave@dev,Stud
-Ruby1,Kennedy,ruby1.qa@dev,
 Mark,Magnacca,mark.sb,Founder
+Ruby,Kennedy,ruby@dev,
+Ed 2,Chin,echin2@dev,
+Ruby2,Kennedy,ruby2@dev,Ruby test user #2
 allego,allego,admin@allego.com,Superuser
+Abby,Chin,abby@dev,-
+UV,Chalimadugu,sc.uv.qa@dev,
+Sudhakar,Chalimadugu,sc@dev,a
+Deandre,Dark,ablack2@dev,Alter Ego
 Ed 3,Chin,echin3@dev,
-Jason,Doe,jasondoe,-
-Hokkun,Pang,hkpang@gmail.com,Customer
-Barry,Neagle,bneagle@allego.com,Sales
-Ed,Chin,echin1999@gmail.com,Janitor
+Sudhakar,Chalimadugu,sc.qa@dev,
+CR,Chalimadugu,sc.cr@dev,
+UV,Chalimadugu,sc.uv@dev,
 S4,Chalimadugu,sc4@dev,
-Bhushan,Biniwale,bhushan.biniwale@mindbowser.com,Developer
+CA,Chalimadugu,sc.ca@dev,
+firstName,lastName,login,title
+S3,Chalimadugu,sc3@dev,
+Eddie,Spaghetti,echin@dev,v3
+Yuchun,Lee,ylee.sb,Founder
+Hokkun,Pang,hkpang@gmail.com,Customer
 VO,Chalimadugu,sc.vo.qa@dev,
-Sheila,Hwee,sheila@dev,Spouse
+All,Users,Wildcard,All Users
+Ed,Chin,echin1999@gmail.com,Janitor
+Barry,Neagle,bneagle@allego.com,Sales
+Hokkun,1031\,hokkun.qa@dev,-

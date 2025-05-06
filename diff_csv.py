@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import random
 # custom imports
-from fwLibary import diffChecker
+from fwLibary import diffChecker , dos2unix
 from utils import env_conf, logger
 from helpers import helper
 
@@ -200,8 +200,83 @@ while index < number_of_companies:
 				shutil.move(userCSV, archive_locatoin)
 				print(f" >>>>> {userCSV} file moved to archive location")
 				sys.exit(1)
+			else:
+				print(f" >>>>> DIFF CHECKER HAS PASSED")
+		
+		# End FileWatcherExpressEnhancement Step 1
 
-		""" End Step 1 """
+		# Create expected users.csv from new file
+        # Run dos2unix here to clean up hidden character else the match will fail
+        # usersCSV set further up for UTF8 checks
+	    # usersCSV=${SOURCE_PARENT_DIR}${COMPANY[$index]}/UPLOAD/${prefix}_users.csv
+
+		if os.path.exists(userCSV):
+			print(f" >>>>> {userCSV}")
+			# Placeholder for any additional script execution or processing
+			# Example: subprocess.run(["/path/to/script.sh", company, userCSV])
+
+			# Move the users.csv file to a new location with a prefix
+			new_userCSV_path = f"{target_parent_dir}/{company.strip()}/users.csv.{prefix}"
+			shutil.move(userCSV, new_userCSV_path)
+			print(f" >>>>> {userCSV} moved to {new_userCSV_path}")
+
+			# Remove the header from the new file and save it as users.csv
+			with open(new_userCSV_path, 'r') as infile, open(f"{target_parent_dir}/{company.strip()}/users.csv", 'w') as outfile:
+				next(infile)  # Skip the header
+				for line in infile:
+					outfile.write(line)
+			print(f" >>>>> Header removed and saved as users.csv")
+			dos2unix(f"{target_parent_dir}/{company.strip()}/users.csv")
+
+			# Run dos2unix equivalent to clean up hidden characters
+			print(f" >>>>> dos2unix cleanup completed")
+
+			# FileWatcherExpressEnhancement Step 2
+            # Compare new users.csv and previous.csv to populate staging tables.
+            # If users.csv was blank from Step 1, addUpdate.csv should be a 1:1 copy of users.csv and disable.csv should be empty.
+
+		addUpdateCSV=f"{target_parent_dir}/{company.strip()}/addUpdate.csv"
+		disableCSV=f"{target_parent_dir}/{company.strip()}/disable.csv"
+		# Check if addUpdate.csv exists, if not create a blank file
+		if not os.path.exists(addUpdateCSV):
+			open(addUpdateCSV, 'w').close()
+			print(f" >>>>> addUpdate.csv created at {addUpdateCSV}")
+		# Check if disable.csv exists, if not create a blank file
+		if not os.path.exists(disableCSV):
+			open(disableCSV, 'w').close()
+			print(f" >>>>> disable.csv created at {disableCSV}")
+		# Compare new users.csv and previous.csv to populate staging tables.
+		# If users.csv was blank from Step 1, addUpdate.csv should be a 1:1 copy of users.csv and disable.csv should be empty.
+		# Backup existing addUpdate.csv and disable.csv with prefix
+		if os.path.exists(addUpdateCSV):
+			os.rename(addUpdateCSV, f"{addUpdateCSV}.{prefix}")
+			print(f" >>>>> addUpdate.csv backed up as {addUpdateCSV}.{prefix}")
+		if os.path.exists(disableCSV):
+			os.rename(disableCSV, f"{disableCSV}.{prefix}")
+			print(f" >>>>> disable.csv backed up as {disableCSV}.{prefix}")
+		# Read users.csv and previous.csv
+		users_file_path = f"{target_parent_dir}/{company.strip()}/users.csv"
+		previous_file_path = f"{target_parent_dir}/{company.strip()}/previous.csv"
+		with open(users_file_path, 'r') as users_file, open(previous_file_path, 'r') as previous_file:
+			users_lines = users_file.readlines()
+			previous_lines = previous_file.readlines()
+		# Populate addUpdate.csv and disable.csv
+		with open(addUpdateCSV, 'w') as add_update_file, open(disableCSV, 'w') as disable_file:
+			if not users_lines:  # If users.csv is blank
+				print(" >>>>> users.csv is blank, addUpdate.csv will be empty, disable.csv will be empty")
+			else:
+				# Create sets of users and previous entries for comparison
+				users_set = set(users_lines[1:])  # Skip header
+				previous_set = set(previous_lines[1:])  # Skip header
+				# Populate addUpdate.csv with new or updated entries
+				add_update_entries = users_set - previous_set
+				add_update_file.writelines(add_update_entries)
+				# Populate disable.csv with removed entries
+				disable_entries = previous_set - users_set
+				disable_file.writelines(disable_entries)
+			print(f" >>>>> addUpdate.csv and disable.csv populated successfully")
+		# End FileWatcherExpressEnhancement Step 2
+
 	print("-----------------------------------")
 
 	index += 1
