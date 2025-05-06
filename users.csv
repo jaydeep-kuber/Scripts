@@ -1,0 +1,51 @@
+firstName,lastName,login,title
+All,Users,Wildcard,All Users
+allego,allego,admin@allego.com,Superuser
+Abby,Chin,abby@dev,-
+CR,Chalimadugu,sc.cr@dev,
+CA,Chalimadugu,sc.ca@dev,
+Eddie,Spaghetti,echin@dev,v3
+Professor,Pang,hpang@dev,Lead Developer
+Yuchun,Lee,ylee@dev,Chief Card Counter
+Mark,Magnacca,mark@allego.com,CEO
+Andre,Black,ablack@dev,Head of Products
+Annie,Taber,ataber@allego.com,Admin
+Barry,Neagle,bneagle@allego.com,Sales
+Jen,Demerle,jdemerle@allego.com,Admin
+Bhushan,Biniwale,bhushan.biniwale@mindbowser.com,Developer
+Pravin,Uttarwar,pravin.uttarwar@mindbowser.com,Tech Lead
+Prashant,Ghungurde,prashant.ghungurde@mindbowser.com,QA Lead
+Ayush,Jain,ayush.jain@mindbowser.com,CEO
+Hokkun,Pang,hkpang@gmail.com,Customer
+Deandre,Dark,ablack2@dev,Alter Ego
+Ed,Chin,echin1999@gmail.com,Janitor
+Sudhakar,Chalimadugu,sc@dev,a
+S3,Chalimadugu,sc3@dev,
+Sheila,Hwee,sheila@dev,Spouse
+Ethan,Pang,ethan@dev,Son
+Nick,Pang,nick@dev,Son
+S4,Chalimadugu,sc4@dev,
+Benjamin,Lee,ben,Son
+Yuchun,Lee,ylee.sb,Founder
+Mark,Magnacca,mark.sb,Founder
+Dave,Cheung,dave@dev,Stud
+UV,Chalimadugu,sc.uv@dev,
+Dev,ChannelAdmin,dev.channeladmin@dev,-
+Ed 陈,Chin,echin.qa@dev,-
+VO,Chalimadugu,sc.vo.qa@dev,
+Sudhakar,Chalimadugu,sc.qa@dev,
+UV,Chalimadugu,sc.uv.qa@dev,
+Hokkun,1031\,hokkun.qa@dev,-
+David,Cheung,dave.qa@dev,-
+John,Doe,jdoe,"mechanic, host"
+Jason,Doe,jasondoe,-
+Ruby,Kennedy,ruby@dev,
+Ruby1,Kennedy,ruby1.qa@dev,
+Ruby2,Kennedy,ruby2.qa@dev, 
+EdAdmin,Chin,echin.prod@dev,-
+Prince,,prince@dev,
+Ruby2,Kennedy,ruby2@dev,Ruby test user #2
+Ed 2,Chin,echin2@dev,
+Ed 3,Chin,echin3@dev,
+"Rob® ""Flash""","Swiston, Esq.",Rob@dev,Job Title
+RubyCA,Kennedy,rubyCA.qa@dev,

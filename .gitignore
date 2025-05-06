@@ -1,0 +1,7 @@
+.env
+
+/myvenv
+__pycache__/
+/logs
+/.vscode
+dump.*
