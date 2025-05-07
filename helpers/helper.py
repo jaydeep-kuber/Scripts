@@ -53,3 +53,22 @@ def CSVfiller(master_path, target_path):
         target_file.writelines(sampled_lines)
 
     print(f"{number} random lines written to {target_path}")
+
+
+def makeCompleteFile(fileName, dirPath):
+    file = f'{fileName}_complete'
+    filePath = os.path.join(dirPath, file)
+
+    # check if the directory exists
+    if not os.path.exists(dirPath):
+        os.makedirs(dirPath)
+        print(f'LOG: helper > makeCompleteFile: Directory {dirPath} created')
+    else:
+        print(f'LOG: helper > makeCompleteFile: Directory {dirPath} already exists')
+    
+    # check if the file exists
+    if not os.path.exists(filePath):
+        open(filePath, 'w').close()
+        print(f'LOG: helper > makeCompleteFile: file {os.path.basename(filePath)} created at {filePath}')
+    else:
+        print(f'LOG: helper > makeCompleteFile: file {os.path.basename(filePath)} already exists at {filePath}')

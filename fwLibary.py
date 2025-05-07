@@ -41,7 +41,7 @@ def dos2unix(file_path):
 
     with open(file_path, 'wb') as f:
         f.write(content)
-    print(f"lib -> file {os.path.basename(file_path)}Converted to Unix format.")
+    print(f"Log: fwLib: file {os.path.basename(file_path)}Converted to Unix format.")
 
 def send_email(from_email, to_email, subject, body):
     smtp_user = env_conf.SMTP_USER
@@ -63,67 +63,107 @@ def send_email(from_email, to_email, subject, body):
         server.login(smtp_user, smtp_pass)
         server.sendmail(from_email, to_email, msg.as_string())
 
+def count_lines_safe(file_path):
+    """
+    Safely counts lines in a file. Returns line count or -1 if file not found.
+    """
+    if not os.path.isfile(file_path):
+        print(f"Error: File '{file_path}' does not exist!")
+        return -1
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return sum(1 for _ in f)
+    except Exception as e:
+        print(f"Error reading file '{file_path}': {e}")
+        return -1
+
+import os
+
+def read_sorted_lines(file_path):
+    """
+    Reads lines from file, strips newlines, sorts them.
+    Returns sorted list or empty list if file missing.
+    """
+    if not os.path.isfile(file_path):
+        print(f"Error: File '{file_path}' does not exist!")
+        return []
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            lines = [line.strip() for line in f if line.strip()]
+            return sorted(lines)
+    except Exception as e:
+        print(f"Error reading file '{file_path}': {e}")
+        return []
+
 # this is main function
-def diffChecker(threshold,Server_location, previousfile, currentfile, idx):
+def diffChecker(threshold,Server_location, previousfile, currentfile, companyId):
 
     # Initialize variables
-    curntFile_lineCount=0
-    prevFile_lineCount=0
-    prev_curnt_diffCount=0
+    diffCurrentCount=0
+    diffPrevCount=0
+    diffCount=0;
+    diffRatio=0;
     myThreshold=threshold
     server_location=Server_location
 
-    CONFIG="trg_home/ubuntu/allegoAdmin/scripts/prod.json" 
-
-    # Get the list of companies from the environment configuration
-    company = env_conf.COMPANY[idx].strip()
-    companyId = env_conf.COMPANY_ID[idx].strip()
-    
     tempFileLoc = 'trg_home/ubuntu/temp/'
       # Temporary file location
     if not os.path.exists(tempFileLoc):
         os.makedirs(tempFileLoc)
-        print(f"lib -> temp dir created for local") 
+        print(f"Log: fwLib: temp dir created for local") 
 
-    # Make temp files split by companyId
-    tempPrevFileName=f"{tempFileLoc}diffPrev_{company}_{companyId}.csv"
-    tempCurrFileName=f"{tempFileLoc}diffCurnt_{company}_{companyId}.csv"
+    if not os.path.exists('trg_home/ubuntu/allegoAdmin/scripts'):
+        os.makedirs('trg_home/ubuntu/allegoAdmin/scripts')
+        print(f"Log: fwLib: scripts dir created for local")
+
+    CONFIG="trg_home/ubuntu/allegoAdmin/scripts/prod.json" 
+    # Check if the configuration file exists
+    if not os.path.isfile(CONFIG):
+        open(CONFIG, 'w').close()  # Create an empty file:
+        print(f"Log: fwLib: Configuration file created at {CONFIG}")
+
+    # Get the list of companies from the environment configuration
+    
+    cid=companyId
+    temp_p=f'trg_home/ubuntu/temp/diffprevious_${cid}.csv';
+    temp_c=f'trg_home/ubuntu/temp/diffcurrent_${cid}.csv';
 
     # Create temporary files at the current location
-    if not os.path.isfile(tempPrevFileName):
-        open(tempPrevFileName, 'w').close()  # Create an empty file
+    if not os.path.isfile(temp_p):
+        open(temp_p, 'w').close()  # Create an empty file
     # copy the previous file to the temp file
-    shutil.copyfile(previousfile, tempPrevFileName)
+    shutil.copyfile(previousfile, temp_p)
     
-    if not os.path.isfile(tempCurrFileName):
-        open(tempCurrFileName, 'w').close()  # Create an empty file
+    if not os.path.isfile(temp_c):
+        open(temp_c, 'w').close()  # Create an empty file
     # copy the current file to the temp file
-    shutil.copyfile(currentfile, tempCurrFileName)
+    shutil.copyfile(currentfile, temp_c)
 
-    dos2unix(tempPrevFileName)
-    dos2unix(tempCurrFileName)
+    dos2unix(temp_p)
+    dos2unix(temp_c)
 
-    # Get the line count of the current file
-    with open(tempCurrFileName, 'r') as f:
-        for line in f:
-            curntFile_lineCount += 1
-    print(f"lib -> Current file line count: {curntFile_lineCount}")
+    # # Get the line count of the current file using wc -l equivalent
+    # diffCurrentCount = sum(1 for _ in open(temp_c, 'r'))
+
+    # # Get the line count of the previous file using wc -l equivalent
+    # diffPrevCount = sum(1 for _ in open(temp_p, 'r'))
     
-    # Get the line count of the previous file
-    with open(tempPrevFileName, 'r') as f:
-        for line in f:
-            prevFile_lineCount += 1
-    print(f"lib -> Previous file line count: {prevFile_lineCount}")
-    
-    # Get the difference count
-    with open(tempPrevFileName, 'r') as f1, open(tempCurrFileName, 'r') as f2:
-        for line1, line2 in zip(f1, f2):
-            if line1 != line2:
-                prev_curnt_diffCount += 1
-    print(f"lib -> Previous and current file difference count: {prev_curnt_diffCount}")
+    lines_p = read_sorted_lines(temp_p)
+    lines_c = read_sorted_lines(temp_c)
+
+    diffCount = len(set(lines_p).intersection(lines_c))
+    print(f"Common lines count: {diffCount}")
+
+
+    diffCurrentCount = count_lines_safe(temp_c)
+    diffPrevCount = count_lines_safe(temp_p)    
+    print(f"Log: fwLib: Current file lines: {diffCurrentCount}")
+    print(f"Log: fwLib: Previous file lines: {diffPrevCount}")
    
 
-    ################ FAIL CASE AND MAIL CASE ######################
+    # ################ FAIL CASE AND MAIL CASE ######################
     FROM_EMAIL = 'jayofficial085@gmail.com'
     TO_EMAIL = 'developerjay297@gmail.com'
     SUBJECT = f"Script testing mail."
@@ -137,33 +177,33 @@ def diffChecker(threshold,Server_location, previousfile, currentfile, idx):
     """ 
         >>> Failure Case 1: "Empty Current File"
     """
-    if curntFile_lineCount == 0:        
-        case1_subject = f"AUP Changeset Warning-Empty File: {company} and {DATE}"
-        case1_body = f"Empty file Detected for Company: {company}.  Check for a 0KB file or a _complete file without any paired users file."
+    if diffCurrentCount == 0:        
+        case1_subject = f"AUP Changeset Warning-Empty File: {companyId} and {DATE}"
+        case1_body = f"Empty file Detected for companyId: {companyId}.  Check for a 0KB file or a _complete file without any paired users file."
         
         # Send email
         send_email(FROM_EMAIL, TO_EMAIL, case1_subject, case1_body)
-        print(f"Email sent to {TO_EMAIL} with subject: {case1_subject}")
+        print(f"LOG: fwLib: Email sent to {TO_EMAIL} with subject: {case1_subject}")
 
         # run the script
         try:
             subprocess.run(CMD)
-            print(f"lib -> setCompanyOnHold.py script executed successfully.")
+            print(f"LOG: fwLib: setCompanyOnHold.py script executed successfully.")
         except subprocess.CalledProcessError as e:
-            print(f"Error executing script: {e}")
+            print(f"Error LOG fwLib: executing script: {e}")
 
         sys.exit(1)
     
     """ 
         >>> # Failure Case 2: Lots of missing Rows, not based on updates, very sensitive.
     """
-    if prevFile_lineCount > curntFile_lineCount:
-        case2_subject = f"AUP Changeset Warning-Lots of missing Rows: {company} and {DATE}"
-        ratio = ((prevFile_lineCount - curntFile_lineCount) / prevFile_lineCount * 100)
-        print(f"PreviousCount > CurrentCount ratio: {round(ratio)}")
+    if diffPrevCount > diffCurrentCount:
+        case2_subject = f"AUP Changeset Warning-Lots of missing Rows: {companyId} and {DATE}"
+        ratio = ((diffPrevCount - diffCurrentCount) / diffPrevCount) * 100
+        print(f"LOG: fwLib: PreviousCount > CurrentCount ratio: {round(ratio)}")
         
         if ratio > myThreshold:
-            case2_body = f"Possible file truncation for company {company}.  File size is significantly smaller than the last run file or is corrupted."
+            case2_body = f"Possible file truncation for company {companyId}.  File size is significantly smaller than the last run file or is corrupted."
             # Send email
             send_email(FROM_EMAIL, TO_EMAIL, case2_subject, case2_body)
             print(f"Email sent to {TO_EMAIL} with subject: {case2_subject}")
@@ -182,12 +222,12 @@ def diffChecker(threshold,Server_location, previousfile, currentfile, idx):
             # Compute Diffs/RowCount ratio, send value back to filewatcher to evaluate.
     """
     
-    ratio = (curntFile_lineCount - prev_curnt_diffCount) / curntFile_lineCount * 100
+    ratio = (diffCurrentCount - diffCount) / diffCurrentCount * 100
     print(f" Case 3 ratio: {round(ratio)}")
 
     if ratio > myThreshold:
-        case3_subject = f"AUP Changeset Warning-Too many general changes: {company} and {DATE}"
-        case3_body = f"Too many changes detected for company {company} ${prev_curnt_diffCount} percent of the file requires updating, which is greater than the current threshold value of ${myThreshold} percent."
+        case3_subject = f"AUP Changeset Warning-Too many general changes: {companyId} and {DATE}"
+        case3_body = f"Too many changes detected for company {companyId} ${diffCount} percent of the file requires updating, which is greater than the current threshold value of ${myThreshold} percent."
 
         # Send email
         send_email(FROM_EMAIL, TO_EMAIL, case3_subject, case3_body)
@@ -200,4 +240,4 @@ def diffChecker(threshold,Server_location, previousfile, currentfile, idx):
             print(f"Error executing script: {e}")
         sys.exit(1)
 
-    print(f"lib -> No issues detected for company: {company}, AUP process can continue.")
+    print(f"lib -> No issues detected for company: {companyId}, AUP process can continue.")

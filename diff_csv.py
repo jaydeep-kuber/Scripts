@@ -29,6 +29,19 @@ filename = os.path.basename(__file__)
 """ 
 	for now this sections is pending
 """
+# Check for override of environment variables passed in as an argument
+if len(sys.argv) > 1:
+	env_file = sys.argv[1]
+	if os.path.exists(env_file):
+		with open(env_file) as f:
+			for line in f:
+				if '=' in line:
+					key, value = line.strip().split('=', 1)
+					os.environ[key] = value
+					print(f"Environment variable overridden: {key}={value}")
+	# else:
+	# 	print(f"Environment file {env_file} does not exist. Exiting.")
+	# 	sys.exit(1)
 
 ## Default threshold if not set to 101 in order to ignore threshold functions
 if threshold == '' or threshold is None:
@@ -128,27 +141,43 @@ while index < number_of_companies:
 			os.makedirs(f"{target_parent_dir}/{company.strip()}")
 			print(f" >>>>> TARGET COMPANY DIR CREAED")
 		
-		# generate random number between 5 to 20
-		# number = random.randint(5, 20) 
 		# check if previous file exists, if not then create a blank file.
-		prev_UserFilePath = f"{target_parent_dir}/{company.strip()}/users.csv"
-		if not os.path.exists(prev_UserFilePath):
-			# create a blank file
-			open(prev_UserFilePath, 'w').close()
-			helper.CSVfiller('users.csv', prev_UserFilePath)
-			print(f" >>>>> PREVIOUS USER FILE CREAED")
+		previousCheck = f"{target_parent_dir}/{company.strip()}/users.csv"
+		previousManualCheck = f"{target_parent_dir}/{company.strip()}/manual_users.csv"
+
+		flag = 'legacy' # this is just for testing purposes, we can remove it later.
+		if flag == 'legacy':
+			print(" >>>>> RUNNING LEGACY VERSION")
+			 # Legacy runs as manual; override Threshold
+			threshold=101
+
+			# Create blank files for previousCheck and previousManualCheck
+			previousCheck = f"{target_parent_dir}/{company.strip()}/blank.csv"
+			previousManualCheck = f"{target_parent_dir}/{company.strip()}/manual_blank.csv"
+
+			# Create the blank files if they do not exist
+			open(previousCheck, 'w').close()
+			print(f" >>>>> Blank file created at {previousCheck}")
+
+			open(previousManualCheck, 'w').close()
+			print(f" >>>>> Manual blank file created at {previousManualCheck}")
 		else:
-			helper.CSVfiller('users.csv', prev_UserFilePath)
-		# do same for prev manual file
-		
-		prev_ManualUserFilePath = f"{target_parent_dir}/{company.strip()}/manual_users.csv"
-		if not os.path.exists(prev_ManualUserFilePath):
-			# create a blank file
-			open(prev_ManualUserFilePath, 'w').close()
-			helper.CSVfiller('users.csv', prev_ManualUserFilePath)
-			print(f" >>>>> PREVIOUS MANUAL USER FILE CREAED")
-		else:
-			helper.CSVfiller('users.csv', prev_ManualUserFilePath)
+			if not os.path.exists(previousCheck):
+				# create a blank file
+				open(previousCheck, 'w').close()
+				helper.CSVfiller('users.csv', previousCheck)
+				print(f" >>>>> PREVIOUS USER FILE CREAED")
+			else:
+				helper.CSVfiller('users.csv', previousCheck)
+			# do same for prev manual file
+			
+			if not os.path.exists(previousManualCheck):
+				# create a blank file
+				open(previousManualCheck, 'w').close()
+				helper.CSVfiller('users.csv', previousManualCheck)
+				print(f" >>>>> PREVIOUS MANUAL USER FILE CREAED")
+			else:
+				helper.CSVfiller('users.csv', previousManualCheck)
 
 		# (assumption) -> check if previous.csv exists, if not then create a blank file.
 		prevUserCSV = f"{target_parent_dir}/{company.strip()}/previous.csv"
@@ -156,9 +185,9 @@ while index < number_of_companies:
 			# create a blank file
 			open(prevUserCSV, 'w').close()
 			print(f" >>>>> PREVIOUS FILE CREAED at {prevUserCSV}")
-			shutil.copy2(prev_UserFilePath, prevUserCSV)
+			shutil.copy2(previousCheck, prevUserCSV)
 		else:
-			shutil.copy2(prev_UserFilePath, prevUserCSV)
+			shutil.copy2(previousCheck, prevUserCSV)
 		print(">>>>> USERS.CSV copied to PREVIOUS.CSV")
 
 		script_path = 'AUP/'

@@ -42,12 +42,27 @@ echo "running filewatcher `date`"
 
 
 ## check for override of env vars passed in as an arg
-## This snippet allows the script to dynamically load the environment variables
-## if we need to use other env vars just pass the file as an argument1.
+
 if [ -n "$1" ]
 then
 . $1
 fi
+
+# ====================== [py Equivalent] =========================
+# We’ll do:
+# Check sys.argv[1] (first argument passed to Python script).
+# If it exists, we’ll load env vars from that file (using either manual parsing or dotenv).
+import sys
+from dotenv import load_dotenv
+import os
+
+if len(sys.argv) > 1:
+    env_file = sys.argv[1]
+    load_dotenv(dotenv_path=env_file, override=True)
+
+# Now env vars are loaded
+print(os.environ.get('DB_USER'))
+
 
 # ================== [THRESHOLD SETTINGS] =========================
 ## Default threshold if not set to 101 in order to ignore threshold functions
@@ -58,6 +73,28 @@ else
 	echo "threshold is set to '$threshold'"; 
 fi
 
+# ====================== [py Equivalent] =========================
+import os
+threshold = os.environ.get('THRESHOLD')
+# Check if threshold is unset or empty
+if not threshold:
+    print("threshold is unset, defaulting to 101")
+    threshold = 101
+else:
+    print(f"threshold is set to '{threshold}'")
+    # ✅ Error Handling: Validate if it's a number
+    try:
+        threshold = int(threshold)
+        if threshold <= 0:
+            print("Error: threshold must be a positive integer. Defaulting to 101.")
+            threshold = 101
+    except ValueError:
+        print("Error: threshold must be a valid integer. Defaulting to 101.")
+        threshold = 101
+# Now threshold is a valid int and safe to use
+
+
+
 ## no longer loop forever, rely on cron instead
 ## while [ 1 -ne 0 ]
 ## do
@@ -66,14 +103,33 @@ fi
 # ================= [COMPANY SPECIFIC LOG SETTINGS] =========================
 exec >> /home/ubuntu/logs/filewatcher.log.${COMPANY[$index]}.`date +"%Y.%m.%d"`
 exec 2>&1
-	# (!) this is in between script so 'log.${COMPANY[$index]}.' is seted by other'
-	index=0; # Q: (!) what is the purpose of this while loop?
+
+	index=0;
 	while [ $index -lt $NUMBER_OF_COMPANIES ]
 	do
+	# LOGIC : So this script loops over multiple companies 
+
 		echo "Checking ${index} `date`" # Checking 0 Tue Apr 29 14:30:00 UTC 2025 ? what this line means?
    		echo "${COMPANY[$index]}"
    		echo "${COMPANYID[$index]}"
    		
+# ====================== [py Equivalent] =========================
+import os
+from datetime import datetime
+company_list = os.environ.get('COMPANY', '').split(',')
+companyid_list = os.environ.get('COMPANYID', '').split(',')
+try:
+    num_companies = int(os.environ.get('NUMBER_OF_COMPANIES', len(company_list)))
+except ValueError:
+    print("Error: NUMBER_OF_COMPANIES must be an integer.")
+    num_companies = len(company_list)
+for index in range(num_companies):
+    print(f"Checking {index} {datetime.now().strftime('%a %b %d %H:%M:%S %Z %Y')}")
+    company = company_list[index] if index < len(company_list) else "<MISSING COMPANY>"
+    company_id = companyid_list[index] if index < len(companyid_list) else "<MISSING COMPANYID>"
+    print(company)
+    print(company_id)
+
 		#
    		# check to see if complete file is present
    		#
