@@ -7,7 +7,7 @@ import subprocess
 import random
 # custom imports
 from fwLibary import diffChecker , dos2unix
-from utils import env_conf, logger
+from utils import custom_logger, env_conf
 from helpers import helper
 
 # ======================[envs]======================================

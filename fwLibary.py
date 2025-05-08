@@ -19,19 +19,15 @@ AUP diff checker diffChecker (previousfile, currentfile, threshold,Server_locati
 
 """
 # py packages
-import datetime
 import os
 import shutil
-
 import smtplib
+import datetime
+import subprocess
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-import subprocess
-import sys
 # custom imports
-from utils import env_conf
-
 def dos2unix(file_path):
     with open(file_path, 'rb') as f:
         content = f.read()
@@ -44,8 +40,8 @@ def dos2unix(file_path):
     print(f"Log: fwLib: file {os.path.basename(file_path)}Converted to Unix format.")
 
 def send_email(from_email, to_email, subject, body):
-    smtp_user = env_conf.SMTP_USER
-    smtp_pass = env_conf.SMTP_PASS
+    smtp_user = os.environ.get('SMTP_USER').strip()
+    smtp_pass = os.environ.get('SMTP_PASS').strip()
     SMTP_SERVER = 'smtp.gmail.com' #'smtp.yourprovider.com'
     SMTP_PORT = 587
     # Create the message
@@ -165,8 +161,7 @@ def diffChecker(threshold,Server_location, previousfile, currentfile, companyId)
 
     # ################ FAIL CASE AND MAIL CASE ######################
     FROM_EMAIL = 'jayofficial085@gmail.com'
-    TO_EMAIL = 'developerjay297@gmail.com'
-    SUBJECT = f"Script testing mail."
+    TO_EMAIL = 'jaydeep.kuber@brevitaz.com'
     DATE = f"{datetime.datetime.now():%d-%m-%Y %H:%M:%S}"
 
     py_path = 'python3'
@@ -192,7 +187,7 @@ def diffChecker(threshold,Server_location, previousfile, currentfile, companyId)
         except subprocess.CalledProcessError as e:
             print(f"Error LOG fwLib: executing script: {e}")
 
-        sys.exit(1)
+        return 0
     
     """ 
         >>> # Failure Case 2: Lots of missing Rows, not based on updates, very sensitive.
@@ -215,7 +210,7 @@ def diffChecker(threshold,Server_location, previousfile, currentfile, companyId)
             except subprocess.CalledProcessError as e:
                 print(f"Error executing script: {e}")
 
-            sys.exit(1)
+            return 1
     
     """
         >>> # Failure Case 3: Too many general changes
@@ -238,6 +233,8 @@ def diffChecker(threshold,Server_location, previousfile, currentfile, companyId)
             print(f"lib -> setCompanyOnHold.py script executed successfully.")
         except subprocess.CalledProcessError as e:
             print(f"Error executing script: {e}")
-        sys.exit(1)
 
-    print(f"lib -> No issues detected for company: {companyId}, AUP process can continue.")
+        return 1
+
+    print(f"LOG: fwLib: No issues detected for company: {companyId}, AUP process can continue.")
+    return 0

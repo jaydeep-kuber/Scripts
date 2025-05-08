@@ -234,13 +234,13 @@ for index in range(num_companies):
 			# Check estimated differences first CASE is based on exit codes. Skip if threshold = 101
 			if [[ ${threshold} -lt 101 ]]
         	then
-        		percent=$(diffChecker ${previousFile} ${usersCSV} ${threshold} ${LOCATION})
+        		percent=$(diffChecker ${previousFile} ${usersCSV} ${threshold} ${LOCATION}) # 0 or 1
 				if [[ ${percent} -eq 1 ]]
 				then
 					echo "Diff Checker has stopped AUP"
 					# Remove complete file and archive Users file when AUP fails
 					rm -rf ${SOURCE_PARENT_DIR}${COMPANY[$index]}/UPLOAD/*_complete
-					mv ${usersCSV} ${TARGET_PARENT_DIR}/aupFailureArchive/${prefix}_${COMPANY[index]}
+					mv ${usersCSV} ${TARGET_PARENT_DIR}/aupFailureArchive/${prefix}_${COMPANY[$index]}
 				    	#mv ${usersCSV} ${TARGET_PARENT_DIR}/aupFailureArchive
 					exit 1
 				else
