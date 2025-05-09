@@ -1,0 +1,10 @@
+EmployeeNumber,FirstName,CommonName,LastName,EmailAddress,JobTitle,Manager,2ndLvlManager,OriginalHireDate,Department,Region,State,Country,City
+1000001,bheem,A,chhota,bheem@example.com,Engineer,motaBheem,lv2_motaBheem,2020-01-15,Engineering,North,CA,IND,ADB
+1000002,raju,B,taklu,raju@example.com,Manager,mightyRaju,lv2_mightyRaju,2021-03-20,Management,South,TX,IND,RJKT
+1000003,jaggu,C,bandar,jaggu@example.com,Analyst,KingKong,lv2_KingKong,2019-05-10,Finance,East,NY,IND,JMN
+1000004,kalia,D,kallu,kalia@example.com,Sales,MotuKallu,lv2_MotuKallu,2022-07-01,Sales,West,FL,IND,DWK
+1000005,dholu,E,lefty,dholu@example.com,jr Sales,LeftyDholu,lv2_LeftyDholu,2023-09-18,Sales,Central,IL,IND,SNGR
+1000006,bholu,F,righty,bholu@example.com,jr Sales,rightyBholu,lv2_rightyBholu,2022-07-01,Sales,South,KL,IND,PTN
+1000007,chutki,G,chhoti,chutki@example.com,jr HR,benChutki,lv2_benChutki,2023-09-18,HR,West,ML,IND,MSHN
+1000008,indumati,H,kumari,indu@example.com,sr HR,raniIndu,lv2_raniIndu,2021-03-20,HR,North,AI,IND,SRT
+

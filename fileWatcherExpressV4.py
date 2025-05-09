@@ -341,10 +341,8 @@ while index < number_of_companies:
             # Compare sorted files to generate addUpdate.csv and disable.csv
 
             # Call function with file paths
-            compare_files(prevFile, 
-                f'{targetCompanyDir}/users.csv',
-                f'{targetCompanyDir}/addUpdate.csv',
-                f'{targetCompanyDir}/disable.csv')        
+            compare_files(prevFile, f'{targetCompanyDir}/users.csv', 
+                          f'{targetCompanyDir}/addUpdate.csv', f'{targetCompanyDir}/disable.csv')        
 
             groupsCSV=f'{source_parent_dir}/{company}/UPLOAD/{prefix}_groups.csv'
             if os.path.exists(groupsCSV):
@@ -352,6 +350,7 @@ while index < number_of_companies:
             else:
                 open(f'{targetCompanyDir}/{prefix}_groups.csv', 'w').close()
                 lg.info(f' file groups.csv created at {targetCompanyDir}/groups.csv')
+
     lg.info("======================================================")
     print("=========================================================")
     index += 1

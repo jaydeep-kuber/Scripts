@@ -74,8 +74,6 @@ def count_lines_safe(file_path):
         print(f"Error reading file '{file_path}': {e}")
         return -1
 
-import os
-
 def read_sorted_lines(file_path):
     """
     Reads lines from file, strips newlines, sorts them.
@@ -187,7 +185,7 @@ def diffChecker(threshold,Server_location, previousfile, currentfile, companyId)
         except subprocess.CalledProcessError as e:
             print(f"Error LOG fwLib: executing script: {e}")
 
-        return 0
+        return 1
     
     """ 
         >>> # Failure Case 2: Lots of missing Rows, not based on updates, very sensitive.
