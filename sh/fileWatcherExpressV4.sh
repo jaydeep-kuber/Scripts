@@ -20,121 +20,44 @@
 
 #
 # redirect all output to logs
-# these lines ensure that all output (normal and error) generate by this script
-# in daily log file.
 #
-
-# ===============[LOG SETTINGS] =========================
 exec >> /home/ubuntu/logs/filewatcher.log.`date +"%Y.%m.%d"`
 exec 2>&1
 
 echo "running filewatcher `date`"
 
-
-# ===============[ENVIRONMENT SETTINGS] =========================
-## this line sources the environment variables from `fileWatcherEnv.sh` file
-## `fileWatcherEnv.sh` needs to present on sys location.
+## set default env vars
 . /home/ubuntu/allegoAdmin/scripts/fileWatcherEnv.sh
 
 ## Import Helper Functions
 . /home/ubuntu/allegoAdmin/scripts/fwLibrary.sh
 
-
-
 ## check for override of env vars passed in as an arg
-
 if [ -n "$1" ]
 then
 . $1
 fi
 
-# ====================== [py Equivalent] =========================
-# We’ll do:
-# Check sys.argv[1] (first argument passed to Python script).
-# If it exists, we’ll load env vars from that file (using either manual parsing or dotenv).
-import sys
-from dotenv import load_dotenv
-import os
-
-if len(sys.argv) > 1:
-    env_file = sys.argv[1]
-    load_dotenv(dotenv_path=env_file, override=True)
-
-# Now env vars are loaded
-print(os.environ.get('DB_USER'))
-
-
-# ================== [THRESHOLD SETTINGS] =========================
 ## Default threshold if not set to 101 in order to ignore threshold functions
-if [ -z ${threshold} ]; 
-then 
-	echo "threshold is unset, defaulting to 101"; threshold=101; 
-else 
-	echo "threshold is set to '$threshold'"; 
-fi
-
-# ====================== [py Equivalent] =========================
-import os
-threshold = os.environ.get('THRESHOLD')
-# Check if threshold is unset or empty
-if not threshold:
-    print("threshold is unset, defaulting to 101")
-    threshold = 101
-else:
-    print(f"threshold is set to '{threshold}'")
-    # ✅ Error Handling: Validate if it's a number
-    try:
-        threshold = int(threshold)
-        if threshold <= 0:
-            print("Error: threshold must be a positive integer. Defaulting to 101.")
-            threshold = 101
-    except ValueError:
-        print("Error: threshold must be a valid integer. Defaulting to 101.")
-        threshold = 101
-# Now threshold is a valid int and safe to use
-
-
+if [ -z ${threshold} ]; then echo "threshold is unset, defaulting to 101"; threshold=101; else echo "threshold is set to '$threshold'"; fi
 
 ## no longer loop forever, rely on cron instead
 ## while [ 1 -ne 0 ]
 ## do
 #exec >> /home/ubuntu/logs/filewatcher.log.`date +"%Y.%m.%d"`
-
-# ================= [COMPANY SPECIFIC LOG SETTINGS] =========================
 exec >> /home/ubuntu/logs/filewatcher.log.${COMPANY[$index]}.`date +"%Y.%m.%d"`
 exec 2>&1
 
 	index=0;
 	while [ $index -lt $NUMBER_OF_COMPANIES ]
 	do
-	# LOGIC : So this script loops over multiple companies 
-
-		echo "Checking ${index} `date`" # Checking 0 Tue Apr 29 14:30:00 UTC 2025 ? what this line means?
+		echo "Checking ${index} `date`"
    		echo "${COMPANY[$index]}"
    		echo "${COMPANYID[$index]}"
-   		
-# ====================== [py Equivalent] =========================
-import os
-from datetime import datetime
-company_list = os.environ.get('COMPANY', '').split(',')
-companyid_list = os.environ.get('COMPANYID', '').split(',')
-try:
-    num_companies = int(os.environ.get('NUMBER_OF_COMPANIES', len(company_list)))
-except ValueError:
-    print("Error: NUMBER_OF_COMPANIES must be an integer.")
-    num_companies = len(company_list)
-for index in range(num_companies):
-    print(f"Checking {index} {datetime.now().strftime('%a %b %d %H:%M:%S %Z %Y')}")
-    company = company_list[index] if index < len(company_list) else "<MISSING COMPANY>"
-    company_id = companyid_list[index] if index < len(companyid_list) else "<MISSING COMPANYID>"
-    print(company)
-    print(company_id)
-
-		#
+   		#
    		# check to see if complete file is present
    		#
-		
-   		for file in `ls ${SOURCE_PARENT_DIR}${COMPANY[$index]}/UPLOAD/*_complete` # /home/solaris/UPL
+   		for file in `ls ${SOURCE_PARENT_DIR}${COMPANY[$index]}/UPLOAD/*_complete`
    		do
    			echo "file `basename $file` exists"
    			fileName=`basename $file`
@@ -146,15 +69,14 @@ for index in range(num_companies):
 			prefix=`echo $fileName | cut -b 1-${offSet}`
    			echo "Prefix: ${prefix}"
 
-            usersCSV=${SOURCE_PARENT_DIR}${COMPANY[$index]}/UPLOAD/${prefix}_users.csv
+            		usersCSV=${SOURCE_PARENT_DIR}${COMPANY[$index]}/UPLOAD/${prefix}_users.csv
 
 			# Check UTF8 files - put this in a f(x)
 	    	case ${COMPANYID[$index]} in
-			218|120) # (!) Q: why 218 and 120? fil hal patiya chhe.. but mare dynamic karva nu chhe.
+			218|120)
 				utfCheck=`iconv -f UTF-8 ${usersCSV} -o /dev/null; echo $?`
             	echo "Checking UTF8 format"
 				if [ "$utfCheck" -ne "0" ]
-   			echo
 	    		then
             		echo "UTF 8 Formatting has invalid characters; exiting"
                 	exit 1
@@ -168,26 +90,13 @@ for index in range(num_companies):
 	    	# FileWatcherExpress updates are part of AAR-1339
 
             # FileWatcherExpressEnhancement Step 1
-            
-			# Make two new target files, 
-				# addUpdate.csv
-				# disable.csv 
-			# by comparisons to the previous run's version of users.csv.
+            # Make two new target files, addUpdate.csv and disable.csv by comparisons to the previous run's version of users.csv.
+            # If no users.csv file exists in this workdirectory (first run of AUP or a hard reset), touch one as blank.
+            # This routine also needs to be done for manual files so support proper manual usage and legacy functions
 
-            # If no users.csv file exists in this workdirectory
-			#	(first run of AUP or a hard reset), touch one as blank.
-
-            # This routine also needs to be done for manual files 
-			# 	so support proper manual usage and legacy functions
-
-            # Get previous file.  At this step, 
-				# it should always be users.csv inside the workdir 
-				# (minus the header). If it doesn't exist, touch a blank one.
-            
-			# If user provides "legacy" flag, 
-				# make a blank previous.csv to reset
-            
-			previousCheck=${TARGET_PARENT_DIR}${COMPANY[$index]}/users.csv
+            # Get previous file.  At this step, it should always be users.csv inside the workdir (minus the header).  If it doesn't exist, touch a blank one.
+            # If user provides "legacy" flag, make a blank previous.csv to reset
+            previousCheck=${TARGET_PARENT_DIR}${COMPANY[$index]}/users.csv
             previousManualCheck=${TARGET_PARENT_DIR}${COMPANY[$index]}/manual_users.csv
             if [[ -n "$2" && "$2" == "legacy" ]]
             then
@@ -209,7 +118,6 @@ for index in range(num_companies):
                     echo "Createing blank Users.csv previous file for first run"
                     touch $previousCheck
                 fi
-
                 if [ -f ${previousManualCheck} ]
                 then
                     echo "A previous manual_Users.csv run as been detected"
@@ -219,28 +127,25 @@ for index in range(num_companies):
                     touch $previousManualCheck
                 fi
             fi
-
-            # Copy previous users.csv 
-			# 	(or blank one you just touched, or blank one you forced in there),
-			#	as previous.csv
+            # Copy previous users.csv (or blank one you just touched, or blank one you forced in there), as previous.csv
             cp $previousCheck ${TARGET_PARENT_DIR}${COMPANY[$index]}/previous.csv
             previousFile=${TARGET_PARENT_DIR}${COMPANY[$index]}/previous.csv
 
          
-            # Upload usersCSV file to channel in AUP Company
+            # Upload file to channel in AUP Company
             /usr/local/bin/python3.6 /home/ubuntu/allegoAdmin/scripts/channels/AUPChannelUploader.py ${channelid} ${usersCSV}
             
 			
 			# Check estimated differences first CASE is based on exit codes. Skip if threshold = 101
 			if [[ ${threshold} -lt 101 ]]
         	then
-        		percent=$(diffChecker ${previousFile} ${usersCSV} ${threshold} ${LOCATION}) # 0 or 1
+        		percent=$(diffChecker ${previousFile} ${usersCSV} ${threshold} ${LOCATION})
 				if [[ ${percent} -eq 1 ]]
 				then
 					echo "Diff Checker has stopped AUP"
 					# Remove complete file and archive Users file when AUP fails
 					rm -rf ${SOURCE_PARENT_DIR}${COMPANY[$index]}/UPLOAD/*_complete
-					mv ${usersCSV} ${TARGET_PARENT_DIR}/aupFailureArchive/${prefix}_${COMPANY[$index]}
+					mv ${usersCSV} ${TARGET_PARENT_DIR}/aupFailureArchive/${prefix}_${COMPANY[index]}
 				    	#mv ${usersCSV} ${TARGET_PARENT_DIR}/aupFailureArchive
 					exit 1
 				else
@@ -248,9 +153,7 @@ for index in range(num_companies):
 				fi
 			fi
 
-            # Copy previous manual_users.csv 
-			#	(or blank one you just touched, or blank one you forced in there), 
-			#	as manual_previous.csv
+            # Copy previous manual_users.csv (or blank one you just touched, or blank one you forced in there), as manual_previous.csv
             cp $previousManualCheck ${TARGET_PARENT_DIR}${COMPANY[$index]}/manual_previous.csv
             previousManualFile=${TARGET_PARENT_DIR}${COMPANY[$index]}/manual_previous.csv
 
@@ -260,7 +163,7 @@ for index in range(num_companies):
             # Run dos2unix here to clean up hidden character else the match will fail
             # usersCSV set further up for UTF8 checks
 	    	# usersCSV=${SOURCE_PARENT_DIR}${COMPANY[$index]}/UPLOAD/${prefix}_users.csv
-            if [ -f ${usersCSV} ]	
+            if [ -f ${usersCSV} ]
             then
                 echo ${usersCSV}
 				#${ALLEGO_HOME}/scripts/copyToAUPViewer.sh "${COMPANY[$index]}" "${usersCSV}"
@@ -335,7 +238,7 @@ for index in range(num_companies):
             comm -13 <(sort $previousManualFile) <(sort ${TARGET_PARENT_DIR}${COMPANY[$index]}/manual_users.csv) > ${TARGET_PARENT_DIR}${COMPANY[$index]}/manual_update.csv
 
    			rm ${SOURCE_PARENT_DIR}${COMPANY[$index]}/UPLOAD/${prefix}_complete
- 
+
    			#
    			# now run the script to load the data into staging tables in the db
    			#

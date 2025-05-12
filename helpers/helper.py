@@ -1,5 +1,57 @@
 import os
 
+import os
+import logging
+
+def touchFile(dir_path, file_name, logger=None):
+    """
+    Ensures that the specified file exists in the given directory.
+    If not present, it creates an empty file and logs the absolute path.
+    
+    Args:
+        dir_path (str): The directory path.
+        file_name (str): The file name.
+        logger (logging.Logger): Optional logger to log actions.
+        
+    Returns:
+        str: Absolute path of the file.
+    """
+    try:
+        # Ensure the directory exists
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+            if logger:
+                logger.info(f"Directory created: {os.path.abspath(dir_path)}")
+            else:
+                print(f"Directory created: {os.path.abspath(dir_path)}")
+
+        # Full file path
+        file_path = os.path.join(dir_path, file_name)
+
+        # Check if file exists
+        if not os.path.isfile(file_path):
+            # Create an empty file
+            with open(file_path, 'w') as f:
+                pass
+            msg = f"File created: {os.path.abspath(file_path)}"
+        else:
+            msg = f"File already exists: {os.path.abspath(file_path)}"
+
+        # Log or print the message
+        if logger:
+            logger.info(msg)
+        else:
+            print(msg)
+
+        return os.path.abspath(file_path)
+
+    except Exception as e:
+        error_msg = f"Error ensuring file exists at {dir_path}/{file_name}: {str(e)}"
+        if logger:
+            logger.error(error_msg)
+        else:
+            print(error_msg)
+
 def makeCSV(path, fileName):
     
     file = os.path.join(path, f'{fileName}.csv')

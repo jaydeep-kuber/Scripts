@@ -16,17 +16,17 @@
 # watch a set of directories for inbound files used for user provisioning.
 # when files come in, move to a separate directory, and kick off import scripts
 # * ===========================================================================
- 
+
 # AUP diff checker diffChecker (previousfile, currentfile, threshold, server)
 
 diffChecker() {
 	# Input Args of Previous File, Current File
 	diffCurrentCount=0;
-    diffPrevCount=0; # unused
+    diffPrevCount=0;
 	diffCount=0;
 	diffRatio=0;
-    myT=${3}; # this is threshold
-    server=${4}; # ths is location 
+    myT=${3};
+    server=${4};
     
     # Make temp files split by companyId
     cid=${COMPANYID[$index]};
@@ -34,7 +34,7 @@ diffChecker() {
     temp_c="/tmp/diffcurrent_${cid}.csv";
 
     # DB config path
-    CONFIG=/home/ubuntu/allegoAdmin/scripts/prod.json # i need to just include this in script, pyfile is ready. 
+    CONFIG=/home/ubuntu/allegoAdmin/scripts/prod.json
     # Delete tmp files
     rm ${temp_p};
     rm ${temp_c};
@@ -50,7 +50,10 @@ diffChecker() {
 
 	# Get Count of Total Rows in Both Files
 	diffCurrentCount="$(wc -l ${temp_c} | awk '{print $1}')"
+    #echo ${diffCurrentCount}
+
     diffPreviousCount="$(wc -l ${temp_p} | awk '{print $1}')"
+    #echo ${diffPreviousCount}
 
 	# Email Headers
 	# SUBJECT="AUP Changeset Warning: ${server}";
