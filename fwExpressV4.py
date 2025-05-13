@@ -8,13 +8,13 @@ import shutil
 
 from utils import custom_logger
 from fwLib import diffChecker
-from helpers import helper
-
+from fwUtils import gpg_decrypt, pgp_decrypt
 
 ###############################################################################################
 env_file = '.env.dev'
 scriptName  = os.path.basename(__file__)
 loggers = {}
+encKyFilePath = 'passphrase.txt'
 
 if len(sys.argv) > 1:
     env_file = sys.argv[1] 
@@ -93,6 +93,31 @@ while index < number_of_companies:
             prefix = fileName[:-9]
             lg.info(f' prefix is:{prefix}')
         
+        # cheking encryption 
+        _, ext = os.path.splitext(filepath)
+
+        if ext == '.gpg':
+            lg.info(f' file is encrypted in gpg, decrypting it')
+            outFileName = f'{prefix}_{company}_users.csv'
+            outFile = os.path.join(upload_dir, outFileName)
+            gpg_decrypt(
+                inFile=filepath, 
+                outFile=outFile,
+                company=company
+                lggr=lg
+            )
+        
+
+        if ext == '.pgp':
+            lg.info(f' file is encrypted in pgp, decrypting it')
+            outFileName = f'{prefix}_users.csv'
+            outFile = os.path.join(upload_dir, outFileName)
+            pgp_decrypt(
+                inFile=filepath,
+                outFile=outFile,
+                company=company,
+                lggr=lg
+            )
 
         """ file Metadata case: 
             this is a feature enhancement. do it later

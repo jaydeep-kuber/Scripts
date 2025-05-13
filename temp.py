@@ -1,58 +1,86 @@
-# import shutil
-
-# shutil.copy2('parentDir/sunovion/UPLOAD/sunovion_complete', 'parentDir/sunovion/UPLOAD/sunovion_users.csv')
-
-import datetime
-from helpers import helper
-from utils import env_conf
+import os
+import sys
+import time
 import subprocess
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-# helper.CSVfiller('users.csv', 'src_home/sunovion/UPLOAD/sunovion_users.csv', 20)
+from dotenv import load_dotenv
 
-# def send_email(from_email, to_email, subject, body):
-#     smtp_user = env_conf.SMTP_USER
-#     smtp_pass = env_conf.SMTP_PASS
-#     SMTP_SERVER = 'smtp.gmail.com' #'smtp.yourprovider.com'
-#     SMTP_PORT = 587
+load_dotenv(dotenv_path='.env.dev')
+
+def getFileMetaData(filePath):
+
+    if not os.path.exists(filePath):
+        print(f"File does not exist at -> {filePath}")
+        return
+     
+    print("File Name:", os.path.basename(filePath))
+    stats = os.stat(filePath)
+    print("Size:", stats.st_size)
+    print("Permissions:", oct(stats.st_mode)[-3:])
+    print("Last modified:", time.ctime(stats.st_mtime))
+    print("Last accessed:", time.ctime(stats.st_atime))
+
+
+def gpg_encrypt(filename: str, key_path: str, **kwargs):
+    """
+    Encrypt a file using GPG with symmetric encryption.
+
+    :param filename: Path to the input file to encrypt.
+    :param key_path: Path to the file containing the passphrase.
+    :param kwargs: Optional GPG options as keyword arguments.
+    """
+    aglo = kwargs.get('aglo', 'AES256')
+    output = kwargs.get('output', f'{filename}.gpg')
+    extra_args = kwargs.get('extra_args', [])
+    if not os.path.exists(key_path):
+        print(f"Key file does not exist at -> {key_path}")
+        return
     
-#     print(f" -> SMTP_USER: {smtp_user}")
-#     print(f" -> SMTP_PASS: {smtp_pass}")
 
-#     # Create the message
-#     msg = MIMEMultipart()
-#     msg['From'] = from_email
-#     msg['To'] = to_email
-#     msg['Subject'] = subject
+    cmd = [
+        'gpg', '--symmetric',
+        '--cipher-algo', aglo,
+        '--batch', '--yes',
+        '--passphrase-file', key_path,
+        '--output', output,
+        *extra_args,
+        filename
+    ]
 
-#     print(f" -> Sending email \n From: {from_email} \n To: {to_email} \n subject: {subject}")
-#     print(f" -> body: {body}")
-#     # Attach the body
-#     msg.attach(MIMEText(body, 'plain'))
+    subprocess.run(cmd, check=True)
+    print("file saved at: ", output)
+    return output
 
-#     # Send the email
-#     with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-#         server.starttls()
-#         server.login(smtp_user, smtp_pass)
-#         server.sendmail(from_email, to_email, msg.as_string())
 
-# DATE = f"{datetime.datetime.now():%d-%m-%Y %H:%M:%S}"
-# FROM_EMAIL = 'jayofficial085@gmail.com'
-# TO_EMAIL = 'developerjay297@gmail.com'
-# SUBJECT = f"Script testing mail. {DATE}"
-# BODY = f"Hello, this is a test email sent from Python script. {DATE}"
-# send_email(FROM_EMAIL, TO_EMAIL, SUBJECT, BODY)
+def gpg_decrypt(filename: str, key_path: str, **kwargs):
+    """
+    Decrypt a GPG-encrypted file using a passphrase.
 
-CONFIG= 'config'
-companyId = '1'
-py_path = 'python3'
-script_path = 'trg_home/ubuntu/allegoAdmin/scripts/'
-script_name = 'setCompanyOnHold.py'
-CMD = [py_path,script_path,script_name,CONFIG,companyId]
+    :param filename: Path to the encrypted .gpg file.
+    :param key_path: Path to the file containing the passphrase.
+    :param kwargs: Optional GPG options as keyword arguments.
+    """
+    outFile = kwargs.get('outFile', filename.replace('.gpg', ''))
+    extra_args = kwargs.get('extra_args', [])
 
-try:
-    subprocess.run(CMD)
-    print(f" >>>>> setCompanyOnHold.py script executed successfully.")
-except subprocess.CalledProcessError as e:
-    print(f"Error executing script: {e}")
+    cmd = [
+        'gpg', '--batch', '--yes',
+        '--passphrase-file', key_path,
+        '--output', outFile,
+        '--decrypt',
+        *extra_args,
+        filename
+    ]
+
+    subprocess.run(cmd, check=True)
+    return outFile
+
+
+if __name__ == "__main__":
+    # filePath = input("Enter the file path carefully: ")
+    filePath = "exp_complete"
+    # getFileMetaData(filePath)
+    # key = os.environ.get('KEY').strip()
+    keyFile = 'passphrase.txt'
+    # encFile = gpg_encrypt(filePath, keyFile)
+    # try_decryptFile(filePath, key)
+    gpg_decrypt('exp_complete.gpg', keyFile)

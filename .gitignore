@@ -7,3 +7,6 @@ __pycache__/
 dump.*
 *.csv.*
 /home
+*_complete
+*.key
+key.*
