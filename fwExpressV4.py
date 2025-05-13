@@ -7,7 +7,7 @@ import glob
 import shutil
 
 from utils import custom_logger
-from fwLibary import diffChecker, dos2unix
+from fwLib import diffChecker
 from helpers import helper
 
 
@@ -168,10 +168,11 @@ while index < number_of_companies:
             except subprocess.CalledProcessError as e:
                 lg.error(f"Error occurred while running AUPChannelUploader: \n  {str(e)}")
 
+
             # Check estimated differences first CASE is based on exit codes. Skip if threshold = 101
             if threshold < 101:  
-                # percent = diffChecker(previousFile, usersCSV, threshold, location)
-                percent = 0
+                percent = diffChecker(previousFile, usersCSV, threshold, location,company,company_id, lg )
+                # percent = 0
                 if percent == 1 :
                     lg.info(f" diffChecker returned {percent}, Diff Checker has stopped AUP ")
                     archive_dir = os.path.join(target_parent_dir, 'aupFailureArchive')
