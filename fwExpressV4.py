@@ -103,8 +103,8 @@ while index < number_of_companies:
             gpg_decrypt(
                 inFile=filepath, 
                 outFile=outFile,
-                company=company
-                lggr=lg
+                company=company,
+                lggr=lg 
             )
         
 
