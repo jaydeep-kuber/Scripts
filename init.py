@@ -25,6 +25,10 @@ def initFileStructure(envFile, copyCsv=0):
         print(f'Created: {scriptDirInTarget}')
     open(script_file, 'w').close()
 
+    if not os.path.exists(f'{allego_home}/scripts'):
+        os.makedirs(f'{allego_home}', exist_ok=True)
+    open(f'{allego_home}/scripts/setCompanyOnHold.py', 'w').close()
+
     importSh = os.path.join(allego_home, 'scripts' , 'import.sh')
     if not os.path.exists(importSh):
         open(importSh, 'w').close()

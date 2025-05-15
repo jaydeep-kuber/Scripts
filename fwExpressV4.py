@@ -1,78 +1,69 @@
-import subprocess
-import sys
-from dotenv import load_dotenv
 import os
-from datetime import datetime
+import sys
+import json
 import glob
 import shutil
+import subprocess
+from dotenv import load_dotenv
+from datetime import datetime
 
 from utils import custom_logger
 from fwLib import diffChecker
 from fwUtils import gpg_decrypt, pgp_decrypt
 
 ###############################################################################################
-env_file = '.env.dev'
+# loading Env file
+envJsonFilePath = 'envJson/fwDevEnv.json'
 scriptName  = os.path.basename(__file__)
 loggers = {}
 encKyFilePath = 'passphrase.txt'
 
 if len(sys.argv) > 1:
-    env_file = sys.argv[1] 
-    load_dotenv(dotenv_path=env_file, override=True)
-    print(f' Loaded env file from arg: {env_file}' )
+    envJsonFilePath = sys.argv[1] 
+    with open(envJsonFilePath) as envJson:
+        env = json.load(envJson)
+    print(f' Loaded env file from arg: {envJsonFilePath}' )
 else:
-    load_dotenv(dotenv_path=env_file, override=True)
-    print(f' loaded env file from default: {env_file}')
+    with open(envJsonFilePath) as envJson:
+        env = json.load(envJson)
+    print(f' loaded env file from default: {envJsonFilePath}')
 
 ######################################################################################################
-# loading env
-companies = os.environ.get('COMPANY').split(',')
-companiesId = os.environ.get('COMPANY_ID').split(',')
-source_parent_dir = os.environ.get('SOURCE_PARENT_DIR').strip()
-target_parent_dir = os.environ.get('TARGET_PARENT_DIR').strip()
-channel_id = os.environ.get('CHANNEL_ID').strip()
-location = os.environ.get('LOCATION').strip()
+companyJsonArray = env["allCompanies"]
+source_parent_dir = env["source_parent_dir"].strip()
+target_parent_dir = env["target_parent_dir"].strip()
+channel_id = env["channelId"]
+location = env["location"].strip()
 ######################################################################################################
 
-threshold = os.environ.get('myTHRESHOLD').strip()
+threshold = env["myThreshold"]
 if not threshold:
     print(" threshold is unset, defaulting to 101")
     threshold = 101
 else:
     print(f" threshold is set to '{threshold}'")
-    try:
-        threshold = int(threshold)
-        if threshold <= 0:
-            print("Error  threshold must be a positive integer. Defaulting to 101.")
-    except ValueError:
-        print("Error  threshold must be a valid integer. Defaulting to 101.")
 
 ######################################################################################################
 # getting the number of companies from the environment variable and checking if it is a valid integer.
 
-number_of_companies = os.environ.get('NUMBER_OF_COMPANIES').strip()
-try:
-    number_of_companies = int(number_of_companies)
-except ValueError:
-    print("Error  NUMBER_OF_COMPANIES must be an integer.")
-    sys.exit(1)
+number_of_companies = env["number_of_company"]
 
 # Error Handling: Check if number_of_companies is a positive integer
 if number_of_companies <= 0:
-    print("Error  NUMBER_OF_COMPANIES must be a positive integer.")
+    print("Error NUMBER_OF_COMPANIES must be a positive integer.gerete than 0")
     sys.exit(1)
 
 ######################################################################################################
 index = 0
 while index < number_of_companies:
   
-    if index >= len(companies) and index >= len(companiesId):
+    if index >= len(companyJsonArray):
         print(f"Error: i think there is mistake in the number of companies and company IDs, please check the env file.")
         break
 
     # Process each company
-    company = companies[index].strip()
-    company_id = companiesId[index].strip()
+    company = companyJsonArray[index].get("cmp_name").strip()
+    company_id = companyJsonArray[index].get("cmp_id")
 
     lg = custom_logger.setup_logger(scriptName, company)
     lg.info(f'logger setted up for - {company} ')
@@ -84,7 +75,10 @@ while index < number_of_companies:
     
     upload_dir = os.path.join(source_parent_dir, company, 'UPLOAD')
     pattern = os.path.join(upload_dir, '*_complete')
-
+    
+    lg.info(f' upload_dir is:{upload_dir}')
+    lg.info(f' pattern is:{pattern}')
+    
     for filepath in glob.glob(pattern):
         if os.path.isfile(filepath):
             lg.info(f' filepath is:{filepath}')
@@ -126,7 +120,8 @@ while index < number_of_companies:
         """
 
         usersCSV = os.path.join(upload_dir, f'{prefix}_users.csv')
-    
+        lg.info(f' usersCSV is:{usersCSV}')
+
         # checking if file is exist 
         if not os.path.exists(usersCSV):
             lg.error(f'{usersCSV} file is not present, stopping and terminating script with exit code 1')
@@ -187,7 +182,7 @@ while index < number_of_companies:
             # /usr/local/bin/python3.6 /home/ubuntu/allegoAdmin/scripts/channels/AUPChannelUploader.py ${channelid} ${usersCSV}
             pyLoc = 'python3'
             scriptLoc = './home/ubuntu/allegoAdmin/scripts/channels/AUPChannelUploader.py'
-            CMD_aupChannel = [pyLoc, scriptLoc, channel_id , usersCSV]
+            CMD_aupChannel = [pyLoc, scriptLoc, str(channel_id) , usersCSV]
             try:
                 subprocess.run(CMD_aupChannel)
             except subprocess.CalledProcessError as e:
@@ -382,5 +377,5 @@ while index < number_of_companies:
                 # Remove complete file after processing
             except Exception as e:
                 lg.error(f"Error executing load script: {str(e)}")
-
+    lg.info(f'for company {company}... work done. ')
     index += 1

@@ -3,7 +3,6 @@ import subprocess
 import shutil
 from datetime import datetime
 
-allegoHome = os.environ.get('ALLEGO_HOME')
 def diffChecker(previousFile, usersCSV, threshold, location, cmpny, cid , lggr=None):
     if lggr:
         lg = lggr
@@ -21,7 +20,7 @@ def diffChecker(previousFile, usersCSV, threshold, location, cmpny, cid , lggr=N
     temp_p = f'./tmp/diffprevious_{cid}.csv'
     temp_c = f'./tmp/diffcurrent_{cid}.csv'
 
-    CONFIG = os.path.join(allegoHome, 'scripts', 'prod.json')
+    CONFIG = '/home/ubuntu/allegoAdmin/scripts/prod.json'
     lg.info(f"config path: {CONFIG}")
     
     if os.path.exists(temp_p):
@@ -87,7 +86,7 @@ def diffChecker(previousFile, usersCSV, threshold, location, cmpny, cid , lggr=N
 
         # company on hold 
         holdResult = subprocess.run(
-            ["/usr/local/bin/python3.6", "/home/ubuntu/allegoAdmin/scripts/setCompanyOnHold.py", CONFIG, cid],
+            ["/usr/local/bin/python3.6", "/home/ubuntu/allegoAdmin/scripts/setCompanyOnHold.py", CONFIG, str(cid)],
             capture_output=True,  # Optional: capture stdout/stderr
             text=True             # Decode output as text instead of bytes
         )

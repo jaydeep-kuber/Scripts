@@ -22,7 +22,7 @@ def getFileMetaData(filePath):
     print("Last accessed:", time.ctime(stats.st_atime))
 
 
-def gpg_decrypt(inFile: str, outFile: str, company: str, lggr=None):
+def gpg_decrypt(inFile: str, outFile: str, company: str, passphrase: str = None, lggr=None):
     """
     Decrypt a GPG-encrypted file.
     """
@@ -35,9 +35,17 @@ def gpg_decrypt(inFile: str, outFile: str, company: str, lggr=None):
     print(f'prefix: {prefix}') 
 
     cmd = [
-        'gpg', '--output' , outFile, inFile
+        'gpg','--batch', '--yes',
+        '--output' , outFile, 
+        '--decrypt', inFile
     ]
     
+    if passphrase:
+        cmd.insert(1, '--passphrase')
+        cmd.insert(2, passphrase)
+    
+    # env = {"GPG_TTY": "/dev/tty"}  # required in some systems , subprocess.run(cmd, check=True, env=env)
+
     try:
         subprocess.run(cmd, check=True)
     except Exception as e:
@@ -55,6 +63,7 @@ def gpg_decrypt(inFile: str, outFile: str, company: str, lggr=None):
     archiveDir = os.path.join(source_parent_dir, company, 'archive')
     if not os.path.exists(archiveDir):
         os.makedirs(archiveDir)
+    
     subprocess.run([
         'mv',
         os.path.join(upload_dir, f'{prefix}_users.csv'),
@@ -66,7 +75,7 @@ def gpg_decrypt(inFile: str, outFile: str, company: str, lggr=None):
 
     return outFile
 
-def pgp_decrypt(inFile: str, outFile: str, company: str, lggr=None):
+def pgp_decrypt(inFile: str, outFile: str, company: str,passphrase: str = None, lggr=None):
     """
     Decrypt a PGP-encrypted file.
     """
@@ -80,9 +89,15 @@ def pgp_decrypt(inFile: str, outFile: str, company: str, lggr=None):
     print(f'prefix: {prefix}') 
 
     cmd = [
-        'gpg', '--output' , outFile, inFile
+        'gpg','--batch', '--yes',
+        '--output' , outFile, 
+        '--decrypt', inFile
     ]
     
+    if passphrase:
+        cmd.insert(1, '--passphrase')
+        cmd.insert(2, passphrase)
+        
     try:
         subprocess.run(cmd, check=True)
     except Exception as e:

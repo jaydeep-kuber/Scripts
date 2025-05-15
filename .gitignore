@@ -10,3 +10,4 @@ dump.*
 *_complete
 *.key
 key.*
+sqlConn.py

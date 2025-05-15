@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import subprocess
+import json
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path='.env.dev')
@@ -75,12 +76,19 @@ def gpg_decrypt(filename: str, key_path: str, **kwargs):
     return outFile
 
 
+def load_env():
+    envJsonFilePath = 'envJson/fileWatcherEnv.json'
+
+    with open(envJsonFilePath) as envJson:  
+        env = json.load(envJson)
+    print("env loaded")
+    return env
+
 if __name__ == "__main__":
-    # filePath = input("Enter the file path carefully: ")
-    filePath = "exp_complete"
-    # getFileMetaData(filePath)
-    # key = os.environ.get('KEY').strip()
-    keyFile = 'passphrase.txt'
-    # encFile = gpg_encrypt(filePath, keyFile)
-    # try_decryptFile(filePath, key)
-    gpg_decrypt('exp_complete.gpg', keyFile)
+    jsonEnv = load_env()
+    # print(jsonEnv)
+    # number_of_company = jsonEnv['number_of_company']
+    # print(number_of_company)
+    allCompJsonArry = jsonEnv['allCompanies']
+    print(allCompJsonArry)
+    print(allCompJsonArry[0].get('cmp_name'))
