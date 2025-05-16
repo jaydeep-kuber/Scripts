@@ -89,30 +89,34 @@ while index < number_of_companies:
         
         # cheking encryption 
         _, ext = os.path.splitext(filepath)
+        encryptionFlag = env["isEncrypted"]
+        lg.info(f' encryptionFlag is:{encryptionFlag}')
 
-        if ext == '.gpg':
-            lg.info(f' file is encrypted in gpg, decrypting it')
-            outFileName = f'{prefix}_{company}_users.csv'
-            outFile = os.path.join(upload_dir, outFileName)
-            gpg_decrypt(
-                inFile=filepath, 
-                outFile=outFile,
-                company=company,
-                lggr=lg 
-            )
-        
+        if encryptionFlag:
+            lg.info(f'Proceeding for descryption')
+            if ext == '.gpg':
+                lg.info(f' file is encrypted in gpg, decrypting it')
+                outFileName = f'{prefix}_{company}_users.csv'
+                outFile = os.path.join(upload_dir, outFileName)
+                gpg_decrypt(
+                    inFile=filepath, 
+                    outFile=outFile,
+                    company=company,
+                    lggr=lg 
+                )
 
-        if ext == '.pgp':
-            lg.info(f' file is encrypted in pgp, decrypting it')
-            outFileName = f'{prefix}_users.csv'
-            outFile = os.path.join(upload_dir, outFileName)
-            pgp_decrypt(
-                inFile=filepath,
-                outFile=outFile,
-                company=company,
-                lggr=lg
-            )
-
+            if ext == '.pgp':
+                lg.info(f' file is encrypted in pgp, decrypting it')
+                outFileName = f'{prefix}_users.csv'
+                outFile = os.path.join(upload_dir, outFileName)
+                pgp_decrypt(
+                    inFile=filepath,
+                    outFile=outFile,
+                    company=company,
+                    lggr=lg
+                )
+        else: 
+            lg.log("no need to decrypion")
         """ file Metadata case: 
             this is a feature enhancement. do it later
             
