@@ -6,6 +6,7 @@ class Assumptions:
 
     def __init__(self, envFile_Path):
         self.envFile = envFile_Path
+        self.logDirPath = './home/ubuntu/logs'
         self.loadEnvFile()
 
     def loadEnvFile(self):
@@ -27,6 +28,7 @@ class Assumptions:
         """ this fucntion create all dirs and sub dirs too """
         os.makedirs(self.source_parent_dir, exist_ok=True)
         os.makedirs(self.target_parent_dir, exist_ok=True)
+        os.makedirs(self.logDirPath, exist_ok=True)
         print(f">>> dir created.")
 
     def cleanUp(self):
