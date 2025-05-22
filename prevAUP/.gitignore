@@ -5,9 +5,12 @@ __pycache__/
 /logs
 /.vscode
 dump.*
-*.csv.*
+*.csv
 /home
 *_complete
 *.key
 key.*
 sqlConn.py
+*.txt
+/sh
+*.gpg
