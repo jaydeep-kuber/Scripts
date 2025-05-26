@@ -1,0 +1,1 @@
+print("AUPchannelUploader script is runnig...")
