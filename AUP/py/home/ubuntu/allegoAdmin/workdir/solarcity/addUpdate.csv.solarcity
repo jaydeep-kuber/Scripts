@@ -1,1 +1,1 @@
-EmployeeNumber,lName,fName,email,number
+EmployeeNumber,FirstName,CommonName,LastName,EmailAddress,JobTitle,Manager,2ndLvlManager,OriginalHireDate,Department,Region,State,Country,City

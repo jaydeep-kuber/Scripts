@@ -125,10 +125,13 @@ def sort_csv_by_column(prevFilePath, currentFilePath, prevOut, currntOut, column
         print("CSV file is empty")
     
     # Use provided column or default to the first column
-    sort_key = column_name if column_name else reader.fieldnames[0] # type: ignore
-    if sort_key not in reader.fieldnames: # type: ignore
-        raise ValueError(f"Column '{sort_key}' not found in CSV headers")
-    
+    try:
+        sort_key = column_name if column_name else reader.fieldnames[0] # type: ignore
+        if sort_key not in reader.fieldnames: # type: ignore
+            raise ValueError(f"Column '{sort_key}' not found in CSV headers")
+    except Exception as e:
+        print(f"Error: {e}")
+        
     sortedCurrentFile = sorted(currentFileData, key= lambda x : x[sort_key])
     # print(sortedCurrentFile)
     print(f"file {currentFilePath} sorted by: {sort_key}")
@@ -341,9 +344,9 @@ def main():
                 else:
                     print("Diff Checker has passed.")
 
-            # copy previousManualCheck to previousFileManual
-            previousFileManual = os.path.join(trgt_dir, company_name , 'previous_manual.csv')
-            shutil.copy2(previousManualCheck, previousFileManual)
+            # copy previousManualCheck to previousManualFile
+            previousManualFile = os.path.join(trgt_dir, company_name , 'manual_previous.csv')
+            shutil.copy2(previousManualCheck, previousManualFile)
             # End FileWatcherExpressEnhancement Step 1
             
             # Run dos2unix here to clean up hidden character else the match will fail
@@ -454,6 +457,82 @@ def main():
                 shutil.move(manualUpdateCSV, manualUpdateCSV)
             else:
                 print(f"manual_update.csv file not found in upload dir: {upload_dir}")
+            
+            # comm -13 <(sort $previousManualFile) <(sort ${TARGET_PARENT_DIR}${COMPANY[$index]}/manual_users.csv) > ${TARGET_PARENT_DIR}${COMPANY[$index]}/manual_update.csv
+            CMD = [
+                    "bash",
+                    "-c",
+                    "comm -13 <(sort {prev}) <(sort {curr}) > {out}".format(
+                        prev=previousManualFile,
+                        curr=trg_manualUsersCSV,
+                        out=manualUpdateCSV
+                    )
+                ]
+            try: 
+                subprocess.run(CMD, check=True)
+            except Exception as e:
+                print(f"Error: {e}")
+            
+            #rm _complete file 
+            src_completeCSV = os.path.join(upload_dir, f"{prefix}_complete.csv")
+            if os.path.exists(src_completeCSV):
+                # rm 
+                shutil.rmtree(src_completeCSV)
+
+            #
+		    # now run the script to load the data into staging tables in the db
+		    #
+    		# stageScript=${ALLEGO_HOME}/conf/import/customer/${COMPANY[$index]}/setup_${COMPANY[$index]}.sql
+            allego_home = env["allego_home"]
+            stageScript = os.path.join(allego_home, "conf", "import", "customer", company_name, f"setup_{company_name}.sql")
+
+            #####################################################################
+            # assumption file is there but, for now make this sql sh file
+            stageScript = Path(stageScript)
+            if not os.path.exists(stageScript):
+                stageScript.parent.mkdir(parents=True, exist_ok=True)
+                stageScript.touch()
+                print(f"file : {stageScript} created")
+            else:
+                print(f"file : {stageScript} exists")
+            ####################################################################
+
+            # echo calling ${stageScript} ${TARGET_PARENT_DIR}${COMPANY[$index]}
+            # ${stageScript} ${TARGET_PARENT_DIR}${COMPANY[$index]}
+
+            print(f"calling {stageScript} {trgt_dir}{company_name}")
+            try:
+                subprocess.run([stageScript, f"{trgt_dir}{company_name}"], check=True)
+            except Exception as e:
+                print(f"exeption : {e}")
+            
+            #
+		    # now run the script to load from staging into production - run this one asynchronously
+		    #
+            # loadScript=${ALLEGO_HOME}/scripts/import.sh
+            loadScript = os.path.join(allego_home, "scripts", "import.sh")
+
+            ########################################################################
+            loadScript = Path(loadScript)
+            if not os.path.exists(loadScript):
+                loadScript.parent.mkdir(parents=True, exist_ok=True)
+                loadScript.touch()
+                print(f"file : {loadScript} created")
+            else:
+                print("loadFile is exist")
+            # copy 
+            shutil.copy2("../playGround.sh" , loadScript)
+            print("load sh file loaded to avoid error")
+            #######################################################################
+
+            # echo calling ${loadScript} ${COMPANYID[$index]}
+            # ${loadScript} ${COMPANYID[$index]}
+            print(f"calling {loadScript} {company_id}")
+            try:
+                subprocess.Popen([loadScript, str(company_id)])
+            except Exception as e:
+                print(f"Exeption : {e}")
+
         print(f"========== iteration - {index} done ===========")
         index += 1
 
