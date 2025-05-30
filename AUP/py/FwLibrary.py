@@ -8,3 +8,5 @@ def DiffChecker(prevFile, userFile, threshold, location):
     server=location;
     
     print("hello from diffchecker")
+    print(f"this is prevfile: {prevFile}, \n this is userfile: {userFile}")
+    return 0

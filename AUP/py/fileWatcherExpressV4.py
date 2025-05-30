@@ -1,11 +1,12 @@
 import os
-import json
 import sys
+import csv
+import json
 import glob
-import subprocess
 import shutil
-from datetime import datetime
+import subprocess
 from pathlib import Path
+from datetime import datetime
 
 #custom imports
 from FwLibrary import DiffChecker
@@ -65,6 +66,118 @@ def thresholdCheck(value):
         int(value) if not isinstance(value, int) else None
     print(f"thresold is: {value} ")
     return value
+
+import os
+
+def cleanCSV(path: str):
+    """
+    Processes the given users CSV:
+    - If the file exists:
+      - Removes the header (first line)
+      - Writes the result back to the same file with Unix-style line endings
+    """
+    if os.path.isfile(path):
+        print(path)
+        
+        # Read lines, skip the first (header), normalize line endings
+        with open(path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()[1:]  # Skip header
+
+        # Write back without header and with Unix line endings
+        with open(path, 'w', encoding='utf-8', newline='\n') as f:
+            for line in lines:
+                f.write(line.rstrip('\r\n') + '\n')
+    else:
+        print(f"File {path} does not exist.")
+
+def sort_csv_by_column(prevFilePath, currentFilePath, prevOut, currntOut, column_name=None):
+    
+    # sorting prev file
+    with open(prevFilePath, mode='r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        prevFileData = list(reader)
+
+    if not prevFileData:
+        print("CSV file is empty")
+
+    # Use provided column or default to the first column
+    sort_key = column_name if column_name else reader.fieldnames[0] # type: ignore
+    if sort_key not in reader.fieldnames: # type: ignore
+        raise ValueError(f"Column '{sort_key}' not found in CSV headers")
+ 
+    sortedPrevFile = sorted(prevFileData, key=lambda x: x[sort_key])    
+    # print(sortedPrevFile)
+    print(f"file: {prevFilePath} sorted by: {sort_key}")
+
+    with open(prevOut, mode='w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=reader.fieldnames) # type: ignore
+        writer.writeheader()
+        writer.writerows(sortedPrevFile)
+    print(f"sorted file saved at: {prevOut}")
+    print("########################################################################")
+  
+    # sorting current file
+    with open(currentFilePath, mode='r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        currentFileData = list(reader)
+
+    if not currentFileData:
+        print("CSV file is empty")
+    
+    # Use provided column or default to the first column
+    sort_key = column_name if column_name else reader.fieldnames[0] # type: ignore
+    if sort_key not in reader.fieldnames: # type: ignore
+        raise ValueError(f"Column '{sort_key}' not found in CSV headers")
+    
+    sortedCurrentFile = sorted(currentFileData, key= lambda x : x[sort_key])
+    # print(sortedCurrentFile)
+    print(f"file {currentFilePath} sorted by: {sort_key}")
+
+    with open(currntOut, mode='w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=reader.fieldnames) # type: ignore
+        writer.writeheader()
+        writer.writerows(sortedCurrentFile)
+
+    print(f"sorted file saved at: {currntOut}")
+    print("#################################[ sorting done ]####################################")
+
+def generate_add_discard_files(current_csv, previous_csv, add_csv, discard_csv):
+    def read_rows(filepath):
+        with open(filepath, newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            header = next(reader)
+            rows = [tuple(row) for row in reader]
+        return header, rows
+
+    # Read both CSVs
+    current_header, current_rows = read_rows(current_csv)
+    previous_header, previous_rows = read_rows(previous_csv)
+
+    # Optional: Check if headers match
+    if current_header != previous_header:
+        raise ValueError("Headers do not match between current and previous CSV files")
+
+    # Convert to sets for comparison
+    current_set = set(current_rows)
+    previous_set = set(previous_rows)
+
+    add_rows = current_set - previous_set  # new rows
+    discard_rows = current_set & previous_set  # existing rows
+
+    # Write add.csv
+    with open(add_csv, mode='w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(current_header)
+        writer.writerows(add_rows)
+    print("file add.csv generated")
+
+    # Write discard.csv
+    with open(discard_csv, mode='w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(current_header)
+        writer.writerows(discard_rows)
+    print("file discard.csv generated")
+    print("#################################[ add/discard files generated ]####################################")
 
 def main():
     # default path
@@ -231,11 +344,116 @@ def main():
             # copy previousManualCheck to previousFileManual
             previousFileManual = os.path.join(trgt_dir, company_name , 'previous_manual.csv')
             shutil.copy2(previousManualCheck, previousFileManual)
+            # End FileWatcherExpressEnhancement Step 1
+            
+            # Run dos2unix here to clean up hidden character else the match will fail
+            # Create expected users.csv from new file
+            # usersCSV set further up for UTF8 checks
+    	    # usersCSV=${SOURCE_PARENT_DIR}${COMPANY[$index]}/UPLOAD/${prefix}_users.csv
+            cleanCSV(usersCSV)
 
-        # End FileWatcherExpressEnhancement Step 1
+            # FileWatcherExpressEnhancement Step 2
+            # Compare new users.csv and previous.csv to populate staging tables.
+            # If users.csv was blank from Step 1, addUpdate.csv should be a 1:1 copy of users.csv and disable.csv should be empty.
 
+            # save addUpdate.csv and disable.csv file paths
+            addUpdateCSV = os.path.join(trgt_dir, company_name, "addUpdate.csv")
+            disableCSV = os.path.join(trgt_dir, company_name, "disable.csv")
 
+            ################################################################################
 
+            assume.createCSVFile(addUpdateCSV) if not os.path.exists(addUpdateCSV) else None
+            assume.createCSVFile(disableCSV) if not os.path.exists(disableCSV) else None
+
+            ################################################################################
+
+            # rename both files to prevent overriding the data
+            try: 
+                os.rename(addUpdateCSV, f"{addUpdateCSV}.{prefix}")
+                os.rename(disableCSV, f"{disableCSV}.{prefix}")
+                print("Renaming done.")
+            except:
+                print(f"Error renaming files: {addUpdateCSV} and {disableCSV}")
+                print("seems like there is no file or remamed exist... exiting from script.")
+                sys.exit(1)
+
+            # now perform line diff 
+            # step-1 sort file. based on id column
+            # sort_csv_by_column("../py/home/ubuntu/allegoAdmin/workdir/solarcity/previous.csv", "../py/home/ubuntu/allegoAdmin/workdir/solarcity/users.csv", "id")
+            # generate_add_discard_files("./sorted_currnt.csv","./sorted_prev.csv","./sortedFiles/add.csv","./sortedFiles/discar.csv")
+
+            ##################################################
+            # creating temp sort dir where we will save sort files
+            # then process for add and discard
+            # then delete this sort dir
+            sort_dir = os.path.join(trgt_dir, company_name, "sort")
+            os.makedirs(sort_dir, exist_ok=True)
+            prevOut = os.path.join(sort_dir, "prevSorted.csv")
+            currOut = os.path.join(sort_dir, "currSorted.csv")
+            ##################################################
+
+            sort_csv_by_column(previousFile, previousCheck,prevOut, currOut,"EmployeeNumber")
+            # in this fuction we are passing the sorted files to generate add and discard files
+            generate_add_discard_files(prevOut,currOut,addUpdateCSV,disableCSV)
+
+            #################################################
+            # clean temporary sort dir
+            shutil.rmtree(sort_dir)
+            print("temp sort dir was removed")
+            #################################################
+            # now we have addUpdate.csv and disable.csv files
+
+            # Older implementatiosn of groups.csb and userGroupMemberShip.csv
+            #store path of grps csv
+            src_groupsCSV=os.path.join(upload_dir, f"{prefix}_groups.csv")
+            trgt_groupsCSV=os.path.join(trgt_dir,company_name,f"groups.csv")
+            if os.path.exists(src_groupsCSV):
+                # mv
+                shutil.move(src_groupsCSV, trgt_groupsCSV)
+                # tail
+                cleanCSV(trgt_groupsCSV)
+            else:
+                print(f"groups.csv file not found in upload dir: {upload_dir}")
+
+            src_userGroupMembershipCSV= os.path.join(upload_dir, f"{prefix}_userGroupMembership.csv") 
+            trgt_userGroupMembershipCSV= os.path.join(trgt_dir,company_name,f"userGroupMembership.csv")
+            if os.path.exists(src_userGroupMembershipCSV):
+                # mv
+                shutil.move(src_userGroupMembershipCSV, trgt_userGroupMembershipCSV)
+                # tail
+                cleanCSV(trgt_userGroupMembershipCSV)
+            else:
+                print(f"userGroupMembership.csv file not found in upload dir: {upload_dir}")
+            
+		# sunovion Legacy implementation
+            src_fbtUsersCSV=os.path.join(upload_dir, f"{prefix}_fbt_users.csv")
+            trgt_fbtUsersCSV = os.path.join(trgt_dir,company_name,f"fbt_users.csv")
+            if os.path.exists(src_fbtUsersCSV):
+                # mv
+                shutil.move(src_fbtUsersCSV, trgt_fbtUsersCSV)
+                # tail
+                cleanCSV(trgt_fbtUsersCSV)
+            else:
+                print(f"fbt_users.csv file not found in upload dir: {upload_dir}")
+
+        # Manual File Support
+            src_manualUsersCSV= os.path.join(upload_dir, f"{prefix}_manual_users.csv")
+            trg_manualUsersCSV = os.path.join(trgt_dir, company_name, "manual_users.csv")
+            if os.path.exists(src_manualUsersCSV):
+                # mv
+                shutil.move(src_manualUsersCSV, trg_manualUsersCSV)
+                # tail
+                cleanCSV(trg_manualUsersCSV)
+            else:
+                print(f"manual_users.csv file not found in upload dir: {upload_dir}")
+        
+        # FileWatcherExpressEnhancement Step 3 - Manual Files
+            manualUpdateCSV = os.path.join(trgt_dir, company_name, "manual_update.csv")
+            if os.path.exists(manualUpdateCSV):
+                # mv
+                shutil.move(manualUpdateCSV, manualUpdateCSV)
+            else:
+                print(f"manual_update.csv file not found in upload dir: {upload_dir}")
         print(f"========== iteration - {index} done ===========")
         index += 1
 

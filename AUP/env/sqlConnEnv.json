@@ -1,0 +1,7 @@
+{ 
+    "DB_CONN": "127.0.0.1",
+    "DB_USER": "mkavi",    
+    "DB_PASS": "mkavi2013",    
+    "DB": "AllegoCoreDB",    
+    "PORT": 6612
+}
