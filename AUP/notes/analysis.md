@@ -267,3 +267,28 @@ these steps are not too ...
 	mv ${groupsCSV} ${TARGET_PARENT_DIR}${COMPANY[$index]}/groups.csv.${prefix}
             tail -n +2 ${TARGET_PARENT_DIR}${COMPANY[$index]}/groups.csv.${prefix} > ${TARGET_PARENT_DIR}${COMPANY[$index]}/groups.csv
 ```
+
+> calling home/ubuntu/allegoAdmin/conf/import/customer/solarcity/setup_solarcity.sql ./home/ubuntu/allegoAdmin/workdir/solarcity
+> exeption : [Errno 13] Permission denied: PosixPath('home/ubuntu/allegoAdmin/conf/import/customer/solarcity/setup_solarcity.sql')
+
+```py
+
+import subprocess
+from pathlib import Path
+
+sql_file = Path("/home/ubuntu/Admin/conf/import/customer/Company/setup_company.sql")
+workdir = Path("/home/ubuntu/Admin/workdir/company")
+
+# Replace with your actual DB config
+psql_command = [
+    "psql",
+    "-h", "localhost",
+    "-U", "your_db_user",
+    "-d", "your_db_name",
+    "-f", str(sql_file)
+]
+
+# You might need to export PGUSER/PGPASSWORD or use .pgpass for password auth
+subprocess.run(psql_command, cwd=workdir)
+
+```
