@@ -131,7 +131,7 @@ def sort_csv_by_column(prevFilePath, currentFilePath, prevOut, currntOut, column
             raise ValueError(f"Column '{sort_key}' not found in CSV headers")
     except Exception as e:
         print(f"Error: {e}")
-        
+
     sortedCurrentFile = sorted(currentFileData, key= lambda x : x[sort_key])
     # print(sortedCurrentFile)
     print(f"file {currentFilePath} sorted by: {sort_key}")
@@ -326,7 +326,7 @@ def main():
             # Check estimated differences first CASE is based on exit codes. Skip if threshold = 101
             if threshold < 101:
                 # true then do something 
-                percent = DiffChecker(previousFile , usersCSV , threshold, "location" )
+                percent = DiffChecker(previousFile , usersCSV , threshold, "location",company_id, cName=company_name )
                 
                 if percent == 1:
                     print("Diff Checker has stopped AUP")
