@@ -162,12 +162,33 @@ def DiffChecker(prevFile, userFile, threshold, location, cid, cName):
         setCompanyOnHold(scriptFile, CONFIG,cid)
         return 1
 
-if __name__ == "__main__":
-    prevFile = "./home/ubuntu/allegoAdmin/workdir/solarcity/previous.csv"
-    userFile = "./home/ubuntu/allegoAdmin/workdir/solarcity/users.csv"
-    threshold = "5"
-    loc = "123.456.789"
-    cid = "14"
-    cName = "comny"
+    # Range of changes ok
+    TO="lperrault@allego.com"
+    SUBJECT="AUP Safe Launch Notification: ${server}"
+    message = (
+        f"{diff_ratio} percent of the userbase is changing, "
+        f"less than the current threshold of {myT} percent. "
+        f"AUP now running for Company: {cName}"
+    )
+    # Use subprocess to send the email
+    try:
+        subprocess.run(
+            ['sudo', 'mutt', '-s', SUBJECT, '-e', f"my_hdr {FROM}", TO],
+            input=message.encode(),
+            check=True
+        )
+    except subprocess.CalledProcessError as e:
+        print("Failed to send email:", e)
+        sys.exit(1)
 
-    DiffChecker(prevFile, userFile, threshold, loc, cid, cName)  # call the function
+    return 0
+
+# if __name__ == "__main__":
+#     prevFile = "./home/ubuntu/allegoAdmin/workdir/solarcity/previous.csv"
+#     userFile = "./home/ubuntu/allegoAdmin/workdir/solarcity/users.csv"
+#     threshold = "5"
+#     loc = "123.456.789"
+#     cid = "14"
+#     cName = "comny"
+
+#     DiffChecker(prevFile, userFile, threshold, loc, cid, cName)  # call the function
