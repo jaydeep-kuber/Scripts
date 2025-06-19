@@ -37,9 +37,9 @@ def setCompanyOnHold(filePath, CONFIG, cid):
     return 1       
 
 def DiffChecker(prevFile, userFile, threshold, location, cid, cName):
-    diffCurrentCount=0;
-    diffPrevCount=0;
-    diffCount=0;
+    diff_current_count=0;
+    diff_previous_count=0;
+    diff_count=0;
     diffRatio=0;
     myT=threshold;
     server=location;
@@ -164,7 +164,7 @@ def DiffChecker(prevFile, userFile, threshold, location, cid, cName):
 
     # Range of changes ok
     TO="lperrault@allego.com"
-    SUBJECT="AUP Safe Launch Notification: ${server}"
+    SUBJECT=f"AUP Safe Launch Notification: ${server}"
     message = (
         f"{diff_ratio} percent of the userbase is changing, "
         f"less than the current threshold of {myT} percent. "
