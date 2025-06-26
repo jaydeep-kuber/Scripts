@@ -38,14 +38,23 @@ import hashlib
 import logging
 import logging.config
 
+from datetime import datetime
+
 def setup_logging(config_path="logging.json"):
     """
     Load logging config from a JSON file and configure logging.
     Falls back to basicConfig if file not found.
     """
+    # creaing log dir
+    os.makedirs("logs", exist_ok=True)
+
+    date_str = datetime.now().strftime("%Y%m%d")
+    log_file = f"logs/log_{date_str}.log"
+
     if os.path.exists(config_path):
         with open(config_path, "r") as f:
             config = json.load(f)
+            config["handlers"]["file"]["filename"] = log_file
         logging.config.dictConfig(config)
     else:
         # fallback
@@ -54,7 +63,7 @@ def setup_logging(config_path="logging.json"):
             format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
             handlers=[
                 logging.StreamHandler(sys.stdout),
-                logging.FileHandler("basic.log")
+                logging.FileHandler(log_file)
                 ]
             )
         logging.warning(f"No logging config found at {config_path}, using basicConfig.")
