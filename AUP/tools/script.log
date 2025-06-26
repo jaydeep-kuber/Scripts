@@ -1,0 +1,12 @@
+2025-06-25 17:44:30,535 - INFO - __main__ - >>> file Validation Complete
+2025-06-25 17:44:30,536 - INFO - __main__ - >>> Header Validation Complete
+2025-06-25 17:44:30,536 - INFO - __main__ - >>> Number of rows are not same
+2025-06-25 17:46:50,638 - INFO - /home/jay/work/scripts/AUP/tools/playG.py - >>> file Validation Complete
+2025-06-25 17:46:50,639 - INFO - /home/jay/work/scripts/AUP/tools/playG.py - >>> Header Validation Complete
+2025-06-25 17:46:50,639 - INFO - /home/jay/work/scripts/AUP/tools/playG.py - >>> Number of rows are not same
+2025-06-25 17:48:04,527 - INFO - playG.py - >>> file Validation Complete
+2025-06-25 17:48:04,531 - INFO - playG.py - >>> Header Validation Complete
+2025-06-25 17:48:04,532 - INFO - playG.py - >>> Number of rows are not same
+2025-06-25 17:49:42,501 - INFO - playG.py - >>> file Validation Complete
+2025-06-25 17:49:42,502 - INFO - playG.py - >>> Header Validation Complete
+2025-06-25 17:49:42,503 - INFO - playG.py - >>> Number of rows are not same
