@@ -163,7 +163,7 @@ def compute_checksum(file_path):
     - check type of index int or str and move accordingly.
 """
 
-CHUNK_SIZE=10000
+CHUNK_SIZE=200
 def process_chunk(filePath, colIndex):
     log.info(f"processing chunking with chunk  size of: {CHUNK_SIZE}")
     
@@ -213,12 +213,16 @@ def merge_chunks(tempFiles, outFileLoc, colIndex, headers):
 
     # tempFile have list of temp dirs paths so below we are open all those files.
     file_handlers = [open(file, 'f', newline='') for file in tempFiles]
+    log.info("Merging file handle ...")
+
     readers = [csv.reader(fr) for fr in file_handlers]
 
+    log.info("file_handlers, readers")
     # skip headers of all files
     for reader in readers:
         next(reader)
     
+    log.info("file_handlers, readers")
     # Merge using heapq
     def sortKey(row):
         return row[colIndex]
@@ -253,8 +257,6 @@ def cleanup(temp_files):
 
 #main
 def sortFile(input_file, sort_key):
-    setup_logging()
-
     try:
         # Step-1: Validate and get headers
         with open(input_file, 'r', newline='') as f:
@@ -282,7 +284,7 @@ def sortFile(input_file, sort_key):
     except:
         log.error("Error in main sort function.")
         sys.exit(1)
-        
+
 # ────────────────────────────────────────────────────────────
 
 def filterNewUsers():
@@ -321,7 +323,7 @@ def compare_csv(oldFile, newFile):
 
     # sort file
     # input file and sort key.
-    sort_key = "id"
+    sort_key = "ID"
     sortFile(oldFile, sort_key)
 
 # ──────────────────────────────
@@ -331,10 +333,10 @@ def main(oldFile,newFile):
 
 
 if __name__ == "__main__":
-    oldFile='../data/csv/oldFile.csv'
+    oldFile='../data/csv/1000row.csv'
     newFile='../data/csv/newFile.csv'
 
-    if len(sys.argv) != 3:
-        print("Usage: python csv_sorter.py <input_file.csv> <sort_column_name>")
-        sys.exit(1)
+    # if len(sys.argv) != 3:
+    #     print("Usage: python csv_sorter.py <input_file.csv> <sort_column_name>")
+    #     sys.exit(1)
     main(oldFile, newFile)

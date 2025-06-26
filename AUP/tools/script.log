@@ -1,0 +1,20 @@
+17:20:03 - INFO | 97 | - main - Starting sorting on file: ../data/csv/1000row.csv by column: ID
+17:20:03 - INFO | 121 | - main - Sorting completed successfully.
+17:21:44 - INFO | 97 | - main - Starting sorting on file: ../data/csv/1000row.csv by column: 0
+17:21:44 - ERROR | 104 | - main - Sort key '0' not found in headers.
+17:22:08 - INFO | 97 | - main - Starting sorting on file: ../data/csv/1000row.csv by column: Gender
+17:22:08 - INFO | 121 | - main - Sorting completed successfully.
+17:22:45 - INFO | 97 | - main - Starting sorting on file: ../data/csv/1000row.csv by column: ID
+17:22:45 - INFO | 121 | - main - Sorting completed successfully.
+17:30:23 - INFO | 97 | - main - Starting sorting on file: ../data/csv/1000row.csv by column: ID
+17:30:23 - INFO | 128 | - main - Sorting completed successfully.
+17:37:33 - INFO | 97 | - main - Starting sorting on file: ../data/csv/1000row.csv by column: ID
+17:37:33 - INFO | 131 | - main - Sorting completed successfully.
+17:45:00 - INFO | 106 | - main - Starting sorting on file: ../data/csv/1000row.csv by column: ID
+17:45:00 - INFO | 140 | - main - Sorting completed successfully.
+17:45:17 - INFO | 106 | - main - Starting sorting on file: ../data/csv/1000row.csv by column: ID
+17:45:17 - INFO | 140 | - main - Sorting completed successfully.
+17:46:48 - INFO | 106 | - main - Starting sorting on file: ../data/csv/1000row.csv by column: ID
+17:46:48 - INFO | 140 | - main - Sorting completed successfully.
+17:46:59 - INFO | 106 | - main - Starting sorting on file: ../data/csv/1000row.csv by column: ID
+17:46:59 - INFO | 140 | - main - Sorting completed successfully.
