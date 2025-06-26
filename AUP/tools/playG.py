@@ -35,6 +35,7 @@ import sys
 import csv
 import json
 import heapq
+import shutil
 import hashlib
 import tempfile
 import logging
@@ -188,9 +189,10 @@ def process_chunk(filePath, colIndex):
                     writer = csv.writer(tmp)
                     writer.writerow(headers)
                     writer.writerows(rows)
-                    file_count += 1
                 tmp_files.append(custom_path)
+                file_count += 1
                 rows = []
+                log.info(f"file {custom_name} sorted.")
 
         # sort the remainnig rows < chunk size
         if rows:
@@ -200,9 +202,15 @@ def process_chunk(filePath, colIndex):
                 writer.writerow(headers)
                 writer.writerows(rows)
             tmp_files.append(custom_path)
+            file_count += 1
+            log.info(f"file {custom_name} sorted.")
+
+    log.info(f"Chunking done. created {len(tmp_files)} number of temp files")
     return tmp_files
 
 def merge_chunks(tempFiles, outFileLoc, colIndex, headers):
+    log.info("Merging all chunked files...")
+
     # tempFile have list of temp dirs paths so below we are open all those files.
     file_handlers = [open(file, 'f', newline='') for file in tempFiles]
     readers = [csv.reader(fr) for fr in file_handlers]
@@ -215,16 +223,66 @@ def merge_chunks(tempFiles, outFileLoc, colIndex, headers):
     def sortKey(row):
         return row[colIndex]
     
+    log.info(f"Merging out file location: {outFileLoc}")
     with open(outFileLoc, 'w', newline='') as outfile:
         writer = csv.writer(outfile)
         writer.writerow(headers)
 
         for row in heapq.merge(*readers , key=sortKey):
             writer.writerow(row)
+
     for fh in file_handlers:
         fh.close()
 
+def safelyReplaceFile(original_path, sorted_path, backup=True):
+    log.info(f"Your have set backup option: {backup}")
+    if backup:
+        backup_path = original_path + ".bak"
+        shutil.copy2(original_path, backup_path)
+        log.info(f"backup done, file stored at: {backup_path}")
+    shutil.move(sorted_path, original_path)
+    log.info("New sorted file override.")
 
+
+def cleanup(temp_files):
+    for path in temp_files:
+        try:
+            os.remove(path)
+        except Exception as e:
+            log.error(f"Failed to delete temp file {path}: {e}")
+
+#main
+def sortFile(input_file, sort_key):
+    setup_logging()
+
+    try:
+        # Step-1: Validate and get headers
+        with open(input_file, 'r', newline='') as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+            if sort_key not in headers:
+                log.error(f"Sort key '{sort_key}' not found in headers.")
+                sys.exit(1)
+            col_index = headers.index(sort_key)
+
+        # Step 2: Chunk → Sort → Write
+        temp_files = process_chunk(input_file, col_index)
+
+        # Step 3: Merge sorted chunks
+        sorted_path = "sorted_ildFile.csv"
+        merge_chunks(temp_files, sorted_path, col_index, headers)
+
+        # Step 4: Replace original file (with backup)
+        safelyReplaceFile(input_file, sorted_path, backup=True)
+
+        # Step 5: Cleanup
+        cleanup(temp_files)
+        log.info("Sorting completed successfully.")
+
+    except:
+        log.error("Error in main sort function.")
+        sys.exit(1)
+        
 # ────────────────────────────────────────────────────────────
 
 def filterNewUsers():
@@ -245,7 +303,7 @@ def fltereDisableUsers():
 def compare_csv(oldFile, newFile):    
     # cheking validation
     is_valid = fileValidation(oldFile,newFile)
-    log.info(">>> file Validation Complete") if is_valid else sys.exit("Validation Failed")            
+    log.info("file Validation Complete") if is_valid else sys.exit("Validation Failed")            
 
     # read csv files
     with open(oldFile, 'r', newline='') as f:
@@ -256,45 +314,27 @@ def compare_csv(oldFile, newFile):
         reader = csv.reader(f)
         newFileColHeaders = next(reader)
         newFileData = [row for row in reader]
-
-    # log.info(oldFileColHeaders)
-    # log.info(newFileColHeaders)
-    # log.info(oldFileData)
-    # log.info(newFileData)
     
     # cheking if both files have same headers
     has_valid_headers= headerValidation(oldFileColHeaders, newFileColHeaders)
-    log.info(">>> Header Validation Complete") if has_valid_headers else sys.exit("Header validation failed!!")
+    log.info("Header Validation Complete") if has_valid_headers else sys.exit("Header validation failed!!")    
 
-    # checkpoint: header validation passed
-    
-    # before processing on data , let's sort the data.
-
-    # processing on csv data.
-    """ need to check
-    - number of rows are same
-        - if not then
-            - detect entire new row
-            - detect rows which have changes in some columns along with index and colName
-    - filter entire new rows and store it 
-    - filter changes and store it
-    - filter same rows and store it
-    """ 
-    # check if number of rows are same
-    if len(oldFileData) != len(newFileData):
-        log.info(">>> Number of rows are not same")
-    else:
-        log.info(">>> Number of rows are same")
-
+    # sort file
+    # input file and sort key.
+    sort_key = "id"
+    sortFile(oldFile, sort_key)
 
 # ──────────────────────────────
 
-def main():
-    oldFile='../data/csv/oldFile.csv'
-    newFile='../data/csv/newFile.csv'
+def main(oldFile,newFile):
     compare_csv(oldFile,newFile)
 
-# ──────────────────────────────
 
 if __name__ == "__main__":
-    main()
+    oldFile='../data/csv/oldFile.csv'
+    newFile='../data/csv/newFile.csv'
+
+    if len(sys.argv) != 3:
+        print("Usage: python csv_sorter.py <input_file.csv> <sort_column_name>")
+        sys.exit(1)
+    main(oldFile, newFile)
