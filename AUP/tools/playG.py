@@ -34,7 +34,9 @@ import os
 import sys
 import csv
 import json
+import heapq
 import hashlib
+import tempfile
 import logging
 import logging.config
 
@@ -73,7 +75,9 @@ log = logging.getLogger(fileName)
 
 # ──────────────────────────────
 
-def validation(oldFile, newFile):
+def fileValidation(oldFile, newFile):
+    log.info("File validation start...")
+
     #check is file is exist
     if not os.path.isfile(oldFile):
         log.info("Old file not found")
@@ -94,30 +98,9 @@ def validation(oldFile, newFile):
     if not oldFile.endswith('.csv') or not newFile.endswith('.csv'):
         log.info("File is not csv")
         return False
-    
+
+    log.info("File validation end..")
     return True
-
-# ──────────────────────────────
-
-def validate_csv(input_file, output_file):
-    """Validate that input and output have the same number of rows."""
-    input_rows = sum(1 for _ in open(input_file)) - 1  # Exclude header
-    output_rows = sum(1 for _ in open(output_file)) - 1
-    if input_rows != output_rows:
-        raise ValueError(f"Data loss detected: Input has {input_rows} rows, output has {output_rows} rows")
-    log.info(f"Validation passed: {input_rows} rows in both input and output")
-
-# ──────────────────────────────
-
-def compute_checksum(file_path):
-    """Compute MD5 checksum of a file for extra validation."""
-    hash_md5 = hashlib.md5()
-    with open(file_path, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
-
-# ──────────────────────────────
 
 def headerValidation(oldFileHeaders, newFileHeaders):
     """
@@ -125,6 +108,9 @@ def headerValidation(oldFileHeaders, newFileHeaders):
     - Header lengths are equal
     - All headers match exactly (case-sensitive and index-sensitive)
     """
+
+    log.info("Header validation start...")
+
     if len(oldFileHeaders) != len(newFileHeaders):
         log.info(f"Header length mismatch:\nOld file: {len(oldFileHeaders)}\nNew file: {len(newFileHeaders)}\n")
         return False
@@ -140,21 +126,106 @@ def headerValidation(oldFileHeaders, newFileHeaders):
         for idx, old, new in mismatches:
             log.info(f"  Index {idx}: '{old}' != '{new}'")
         return False
+    
+    log.info("Header validation end...")
     return True
 
-# ──────────────────────────────
 
-def sortCsvFiles(oldFileData, newFileData, index):
-    """ 
+# ──────────────────────────────VALIDATE SORTED FILE──────────────────────────────
+
+def validate_final_csv(input_file, output_file):
+    """Validate that input and output have the same number of rows."""
+    
+    log.info("Validating number of rows in file after sorting...")
+
+    input_rows = sum(1 for _ in open(input_file)) - 1  # Exclude header
+    output_rows = sum(1 for _ in open(output_file)) - 1
+    if input_rows != output_rows:
+        raise ValueError(f"Data loss detected: Input has {input_rows} rows, output has {output_rows} rows")
+    log.info(f"Validation passed: {input_rows} rows in both input and output")
+
+def compute_checksum(file_path):
+    """Compute MD5 checksum of a file for extra validation."""
+    
+    log.info("Computing checksum for validation, is file corrupted..")
+    
+    hash_md5 = hashlib.md5()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+# ──────────────────────────────SORTING──────────────────────────────
+""" 
     - Sort csv files based on the specified index
     - took index if it is in parameter else took the first column.
     - check type of index int or str and move accordingly.
-    """
-    # index setting
-    index = index if index else 0
-    pass
+"""
 
-# ──────────────────────────────
+CHUNK_SIZE=10000
+def process_chunk(filePath, colIndex):
+    log.info(f"processing chunking with chunk  size of: {CHUNK_SIZE}")
+    
+    tmp_files = []
+    temp_dir = tempfile.gettempdir()
+    log.info(f"temp file directory: {temp_dir}")
+
+    file_count = 0 # or any counter
+    custom_name = f"chunk_{file_count}.csv"
+    custom_path = os.path.join(temp_dir, custom_name)
+    log.info(f"final file with path: {custom_path}")
+
+    with open(filePath, 'r', newline='') as f:
+        reader = csv.reader(f)
+        headers = next(f)
+
+        rows = []
+        for rw in reader:
+            rows.append(rw)
+            if len(rows) >= CHUNK_SIZE:
+                rows.sort(key=lambda x: x[colIndex])
+                with open(custom_path, 'w', newline='') as tmp:
+                    writer = csv.writer(tmp)
+                    writer.writerow(headers)
+                    writer.writerows(rows)
+                    file_count += 1
+                tmp_files.append(custom_path)
+                rows = []
+
+        # sort the remainnig rows < chunk size
+        if rows:
+            rows.sort(key=lambda x: x[colIndex]) # lambda x: x[colIndex] col extractor
+            with open(custom_path, 'w', newline='') as tmp:
+                writer = csv.writer(tmp)
+                writer.writerow(headers)
+                writer.writerows(rows)
+            tmp_files.append(custom_path)
+    return tmp_files
+
+def merge_chunks(tempFiles, outFileLoc, colIndex, headers):
+    # tempFile have list of temp dirs paths so below we are open all those files.
+    file_handlers = [open(file, 'f', newline='') for file in tempFiles]
+    readers = [csv.reader(fr) for fr in file_handlers]
+
+    # skip headers of all files
+    for reader in readers:
+        next(reader)
+    
+    # Merge using heapq
+    def sortKey(row):
+        return row[colIndex]
+    
+    with open(outFileLoc, 'w', newline='') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerow(headers)
+
+        for row in heapq.merge(*readers , key=sortKey):
+            writer.writerow(row)
+    for fh in file_handlers:
+        fh.close()
+
+
+# ────────────────────────────────────────────────────────────
 
 def filterNewUsers():
     pass
@@ -173,7 +244,7 @@ def fltereDisableUsers():
 
 def compare_csv(oldFile, newFile):    
     # cheking validation
-    is_valid = validation(oldFile,newFile)
+    is_valid = fileValidation(oldFile,newFile)
     log.info(">>> file Validation Complete") if is_valid else sys.exit("Validation Failed")            
 
     # read csv files
@@ -198,7 +269,6 @@ def compare_csv(oldFile, newFile):
     # checkpoint: header validation passed
     
     # before processing on data , let's sort the data.
-    sortCsvFiles(oldFileData, newFileData, 0)
 
     # processing on csv data.
     """ need to check
