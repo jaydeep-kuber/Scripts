@@ -36,6 +36,7 @@ import csv
 import json
 import heapq
 import shutil
+import random
 import hashlib
 import tempfile
 import logging
@@ -164,78 +165,107 @@ def compute_checksum(file_path):
 """
 
 CHUNK_SIZE=200
-def process_chunk(filePath, colIndex):
+
+def infer_column_type(file_path, column_name):
+    with open(file_path, newline='') as csvfile:
+        reader = list(csv.DictReader(csvfile))
+
+        if column_name not in reader[0].keys():
+            print("Columnn is not Exist")
+            return
+
+    if len(reader) < 10:
+        sample_rows = reader  # use all rows if < 10
+    else:
+        sample_rows = random.sample(reader, 10)
+
+    type_counts = {"int": 0, "float": 0, "str": 0}
+    missing_count = 0
+
+    for row in sample_rows:
+        value = row.get(column_name, "").strip()
+
+        if value == "" or value.lower() in ("na", "null", "none"):
+            missing_count += 1
+            continue
+
+        try:
+            int(value)
+            type_counts["int"] += 1
+        except ValueError:
+            try:
+                float(value)
+                type_counts["float"] += 1
+            except ValueError:
+                type_counts["str"] += 1
+
+    # Choose the most frequent type
+    if all(count == 0 for count in type_counts.values()):
+        final_type = "unknown"
+    else:
+        final_type = max(type_counts, key=type_counts.get) # type: ignore
+
+    return final_type
+
+def process_chunk(filePath, col_index):
     log.info(f"processing chunking with chunk  size of: {CHUNK_SIZE}")
     
-    tmp_files = []
-    temp_dir = tempfile.gettempdir()
-    log.info(f"temp file directory: {temp_dir}")
+    temp_files = []
 
-    file_count = 0 # or any counter
-    custom_name = f"chunk_{file_count}.csv"
-    custom_path = os.path.join(temp_dir, custom_name)
-    log.info(f"final file with path: {custom_path}")
-
-    with open(filePath, 'r', newline='') as f:
+    with open(filePath, "r", newline='', encoding='utf-8') as f:
         reader = csv.reader(f)
-        headers = next(f)
-
+        headers = next(reader)
         rows = []
-        for rw in reader:
-            rows.append(rw)
-            if len(rows) >= CHUNK_SIZE:
-                rows.sort(key=lambda x: x[colIndex])
-                with open(custom_path, 'w', newline='') as tmp:
-                    writer = csv.writer(tmp)
-                    writer.writerow(headers)
-                    writer.writerows(rows)
-                tmp_files.append(custom_path)
-                file_count += 1
-                rows = []
-                log.info(f"file {custom_name} sorted.")
+        chunk_counter = 0
 
-        # sort the remainnig rows < chunk size
-        if rows:
-            rows.sort(key=lambda x: x[colIndex]) # lambda x: x[colIndex] col extractor
-            with open(custom_path, 'w', newline='') as tmp:
-                writer = csv.writer(tmp)
+        for row in reader:
+            rows.append(row)
+            if len(rows) >= CHUNK_SIZE:
+                rows.sort(key=lambda x: x[col_index]) if CUL_KY_DTYP == 'str' else rows.sort(key=lambda x: int(x[col_index])) 
+                temp = tempfile.NamedTemporaryFile(delete=False, mode='w', newline='', suffix='.csv')
+                writer = csv.writer(temp)
                 writer.writerow(headers)
                 writer.writerows(rows)
-            tmp_files.append(custom_path)
-            file_count += 1
-            log.info(f"file {custom_name} sorted.")
+                temp_files.append(temp.name)
+                temp.close()
+                rows = []
+                log.info(f"processing done for chunk: {chunk_counter+1}")
+            
 
-    log.info(f"Chunking done. created {len(tmp_files)} number of temp files")
-    return tmp_files
+        if rows:  # handle last chunk
+            rows.sort(key=lambda x: x[col_index]) if CUL_KY_DTYP == 'str' else rows.sort(key=lambda x: int(x[col_index]))
+            temp = tempfile.NamedTemporaryFile(delete=False, mode='w', newline='', suffix='.csv')
+            writer = csv.writer(temp)
+            writer.writerow(headers)
+            writer.writerows(rows)
+            temp_files.append(temp.name)
+            temp.close()
+            log.info(f"processing done for chunk: {chunk_counter+1}")
 
-def merge_chunks(tempFiles, outFileLoc, colIndex, headers):
+    log.info(f"Chunking process done")
+    return temp_files
+
+def merge_chunks(temp_files, output_path, col_index, headers):
     log.info("Merging all chunked files...")
 
     # tempFile have list of temp dirs paths so below we are open all those files.
-    file_handlers = [open(file, 'f', newline='') for file in tempFiles]
-    log.info("Merging file handle ...")
+    file_handles = [open(f, "r", newline='', encoding='utf-8') for f in temp_files]
+    readers = [csv.reader(fh) for fh in file_handles]
 
-    readers = [csv.reader(fr) for fr in file_handlers]
-
-    log.info("file_handlers, readers")
-    # skip headers of all files
     for reader in readers:
         next(reader)
-    
-    log.info("file_handlers, readers")
-    # Merge using heapq
-    def sortKey(row):
-        return row[colIndex]
-    
-    log.info(f"Merging out file location: {outFileLoc}")
-    with open(outFileLoc, 'w', newline='') as outfile:
-        writer = csv.writer(outfile)
+
+    def sort_key(row):
+        return row[col_index] if CUL_KY_DTYP == 'str' else int(row[col_index]) 
+
+    with open(output_path, "w", newline='', encoding='utf-8') as out_file:
+        writer = csv.writer(out_file)
         writer.writerow(headers)
 
-        for row in heapq.merge(*readers , key=sortKey):
+        for row in heapq.merge(*readers, key=sort_key):
             writer.writerow(row)
 
-    for fh in file_handlers:
+    for fh in file_handles:
         fh.close()
 
 def safelyReplaceFile(original_path, sorted_path, backup=True):
@@ -255,23 +285,37 @@ def cleanup(temp_files):
         except Exception as e:
             log.error(f"Failed to delete temp file {path}: {e}")
 
-#main
+#main for sort files
 def sortFile(input_file, sort_key):
+    global CUL_KY_DTYP
+    CUL_KY_DTYP = infer_column_type(input_file, sort_key)
+    print(CUL_KY_DTYP)
     try:
-        # Step-1: Validate and get headers
-        with open(input_file, 'r', newline='') as f:
+        log.info(f"Starting sorting on file: {input_file} by column: {sort_key}")
+
+        # Step 1: Validate and get headers
+        with open(input_file, 'r', newline='', encoding='utf-8') as f:
             reader = csv.reader(f)
             headers = next(reader)
-            if sort_key not in headers:
-                log.error(f"Sort key '{sort_key}' not found in headers.")
+            if isinstance(sort_key, str):
+                if sort_key not in headers:
+                    log.error(f"Sort key '{sort_key}' not found in headers.")
+                    sys.exit(1)
+                col_index = headers.index(sort_key)
+            elif isinstance(sort_key, int):
+                if sort_key < 0 or sort_key >= len(headers):
+                    log.error(f"Sort key index {sort_key} is out of range.")
+                    sys.exit(1)
+                col_index = sort_key
+            else:
+                log.error("Sort key must be a string (column name) or an integer (index).")
                 sys.exit(1)
-            col_index = headers.index(sort_key)
-
+                
         # Step 2: Chunk → Sort → Write
         temp_files = process_chunk(input_file, col_index)
 
         # Step 3: Merge sorted chunks
-        sorted_path = "sorted_ildFile.csv"
+        sorted_path = "sorted_output.csv"
         merge_chunks(temp_files, sorted_path, col_index, headers)
 
         # Step 4: Replace original file (with backup)
@@ -279,15 +323,16 @@ def sortFile(input_file, sort_key):
 
         # Step 5: Cleanup
         cleanup(temp_files)
+
         log.info("Sorting completed successfully.")
 
-    except:
-        log.error("Error in main sort function.")
+    except Exception as e:
+        log.exception(f"Unexpected error occurred: {e}")
         sys.exit(1)
-
 # ────────────────────────────────────────────────────────────
 
 def filterNewUsers():
+    """  """
     pass
 
 # ──────────────────────────────
@@ -302,7 +347,7 @@ def fltereDisableUsers():
 
 # ──────────────────────────────
 
-def compare_csv(oldFile, newFile):    
+def main(oldFile, newFile):    
     # cheking validation
     is_valid = fileValidation(oldFile,newFile)
     log.info("file Validation Complete") if is_valid else sys.exit("Validation Failed")            
@@ -325,18 +370,12 @@ def compare_csv(oldFile, newFile):
     # input file and sort key.
     sort_key = "ID"
     sortFile(oldFile, sort_key)
+    sortFile(newFile, sort_key)
 
 # ──────────────────────────────
-
-def main(oldFile,newFile):
-    compare_csv(oldFile,newFile)
-
 
 if __name__ == "__main__":
     oldFile='../data/csv/1000row.csv'
     newFile='../data/csv/newFile.csv'
 
-    # if len(sys.argv) != 3:
-    #     print("Usage: python csv_sorter.py <input_file.csv> <sort_column_name>")
-    #     sys.exit(1)
     main(oldFile, newFile)

@@ -1,0 +1,19 @@
+16:17:07 - INFO | 81 | - playG.py - File validation start...
+16:17:07 - INFO | 104 | - playG.py - File validation end..
+16:17:07 - INFO | 352 | - playG.py - file Validation Complete
+16:17:07 - INFO | 114 | - playG.py - Header validation start...
+16:17:07 - INFO | 132 | - playG.py - Header validation end...
+16:17:07 - INFO | 366 | - playG.py - Header Validation Complete
+16:17:07 - INFO | 294 | - playG.py - Starting sorting on file: ../data/csv/1000row.csv by column: ID
+16:17:07 - INFO | 211 | - playG.py - processing chunking with chunk  size of: 200
+16:17:07 - INFO | 232 | - playG.py - processing done for chunk: 1
+16:17:07 - INFO | 232 | - playG.py - processing done for chunk: 1
+16:17:07 - INFO | 232 | - playG.py - processing done for chunk: 1
+16:17:07 - INFO | 232 | - playG.py - processing done for chunk: 1
+16:17:07 - INFO | 232 | - playG.py - processing done for chunk: 1
+16:17:07 - INFO | 245 | - playG.py - Chunking process done
+16:17:07 - INFO | 249 | - playG.py - Merging all chunked files...
+16:17:07 - INFO | 272 | - playG.py - Your have set backup option: True
+16:17:07 - INFO | 276 | - playG.py - backup done, file stored at: ../data/csv/1000row.csv.bak
+16:17:07 - INFO | 278 | - playG.py - New sorted file override.
+16:17:07 - INFO | 327 | - playG.py - Sorting completed successfully.

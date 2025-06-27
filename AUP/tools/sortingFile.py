@@ -8,8 +8,56 @@ import logging.config
 import tempfile
 import shutil
 from datetime import datetime
+import random
 
-CHUNK_SIZE = 10000  # You can tune this
+CHUNK_SIZE = 200  # You can tune this
+# CUL_KY_DTYP = None
+def infer_column_type(file_path, column_name):
+    with open(file_path, newline='') as csvfile:
+        reader = list(csv.DictReader(csvfile))
+
+        if column_name not in reader[0].keys():
+            print("Columnn is not Exist")
+            return
+
+    if len(reader) < 10:
+        sample_rows = reader  # use all rows if < 10
+    else:
+        sample_rows = random.sample(reader, 10)
+
+    type_counts = {"int": 0, "float": 0, "str": 0}
+    missing_count = 0
+
+    for row in sample_rows:
+        value = row.get(column_name, "").strip()
+
+        if value == "" or value.lower() in ("na", "null", "none"):
+            missing_count += 1
+            continue
+
+        try:
+            int(value)
+            type_counts["int"] += 1
+        except ValueError:
+            try:
+                float(value)
+                type_counts["float"] += 1
+            except ValueError:
+                type_counts["str"] += 1
+
+    # Choose the most frequent type
+    if all(count == 0 for count in type_counts.values()):
+        final_type = "unknown"
+    else:
+        final_type = max(type_counts, key=type_counts.get) # type: ignore
+
+    return final_type
+    # return {
+    #     "column": column_name,
+    #     "sample_size": len(sample_rows),
+    #     "inferred_type": final_type,
+    #     "missing_values": missing_count,
+    # }
 
 # ─────────────────────────────────────
 def setup_logging(config_path='logging.json'):
@@ -32,7 +80,7 @@ def process_chunks(file_path, col_index):
         for row in reader:
             rows.append(row)
             if len(rows) >= CHUNK_SIZE:
-                rows.sort(key=lambda x: x[col_index])
+                rows.sort(key=lambda x: x[col_index]) if CUL_KY_DTYP == 'str' else rows.sort(key=lambda x: int(x[col_index])) 
                 temp = tempfile.NamedTemporaryFile(delete=False, mode='w', newline='', suffix='.csv')
                 writer = csv.writer(temp)
                 writer.writerow(headers)
@@ -42,7 +90,7 @@ def process_chunks(file_path, col_index):
                 rows = []
 
         if rows:  # handle last chunk
-            rows.sort(key=lambda x: x[col_index])
+            rows.sort(key=lambda x: x[col_index]) if CUL_KY_DTYP == 'str' else rows.sort(key=lambda x: int(x[col_index]))
             temp = tempfile.NamedTemporaryFile(delete=False, mode='w', newline='', suffix='.csv')
             writer = csv.writer(temp)
             writer.writerow(headers)
@@ -61,7 +109,7 @@ def merge_chunks(temp_files, output_path, col_index, headers):
         next(reader)
 
     def sort_key(row):
-        return row[col_index]
+        return row[col_index] if CUL_KY_DTYP == 'str' else int(row[col_index]) 
 
     with open(output_path, "w", newline='', encoding='utf-8') as out_file:
         writer = csv.writer(out_file)
@@ -94,6 +142,9 @@ def main(input_file, sort_key):
     setup_logging()
     logger = logging.getLogger("main")
 
+    global CUL_KY_DTYP
+    CUL_KY_DTYP = infer_column_type(input_file, sort_key)
+    print(CUL_KY_DTYP)
     try:
         logger.info(f"Starting sorting on file: {input_file} by column: {sort_key}")
 
@@ -101,7 +152,6 @@ def main(input_file, sort_key):
         with open(input_file, 'r', newline='', encoding='utf-8') as f:
             reader = csv.reader(f)
             headers = next(reader)
-
             if isinstance(sort_key, str):
                 if sort_key not in headers:
                     logger.error(f"Sort key '{sort_key}' not found in headers.")
