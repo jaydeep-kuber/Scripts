@@ -221,7 +221,7 @@ def process_chunk(filePath, col_index):
         for row in reader:
             rows.append(row)
             if len(rows) >= CHUNK_SIZE:
-                rows.sort(key=lambda x: x[col_index]) if CUL_KY_DTYP == 'str' else rows.sort(key=lambda x: int(x[col_index])) 
+                rows.sort(key=lambda x: x[col_index]) if COL_KY_DTYP == 'str' else rows.sort(key=lambda x: int(x[col_index])) 
                 temp = tempfile.NamedTemporaryFile(delete=False, mode='w', newline='', suffix='.csv')
                 writer = csv.writer(temp)
                 writer.writerow(headers)
@@ -230,10 +230,11 @@ def process_chunk(filePath, col_index):
                 temp.close()
                 rows = []
                 log.info(f"processing done for chunk: {chunk_counter+1}")
+                chunk_counter += 1
             
 
         if rows:  # handle last chunk
-            rows.sort(key=lambda x: x[col_index]) if CUL_KY_DTYP == 'str' else rows.sort(key=lambda x: int(x[col_index]))
+            rows.sort(key=lambda x: x[col_index]) if COL_KY_DTYP == 'str' else rows.sort(key=lambda x: int(x[col_index]))
             temp = tempfile.NamedTemporaryFile(delete=False, mode='w', newline='', suffix='.csv')
             writer = csv.writer(temp)
             writer.writerow(headers)
@@ -256,7 +257,7 @@ def merge_chunks(temp_files, output_path, col_index, headers):
         next(reader)
 
     def sort_key(row):
-        return row[col_index] if CUL_KY_DTYP == 'str' else int(row[col_index]) 
+        return row[col_index] if COL_KY_DTYP == 'str' else int(row[col_index]) 
 
     with open(output_path, "w", newline='', encoding='utf-8') as out_file:
         writer = csv.writer(out_file)
@@ -271,7 +272,7 @@ def merge_chunks(temp_files, output_path, col_index, headers):
 def safelyReplaceFile(original_path, sorted_path, backup=True):
     log.info(f"Your have set backup option: {backup}")
     if backup:
-        backup_path = original_path + ".bak"
+        backup_path = os.path.join("backups", f"{os.path.basename(original_path)}.bck")
         shutil.copy2(original_path, backup_path)
         log.info(f"backup done, file stored at: {backup_path}")
     shutil.move(sorted_path, original_path)
@@ -287,9 +288,9 @@ def cleanup(temp_files):
 
 #main for sort files
 def sortFile(input_file, sort_key):
-    global CUL_KY_DTYP
-    CUL_KY_DTYP = infer_column_type(input_file, sort_key)
-    print(CUL_KY_DTYP)
+    global COL_KY_DTYP
+    COL_KY_DTYP = infer_column_type(input_file, sort_key)
+    print(COL_KY_DTYP)
     try:
         log.info(f"Starting sorting on file: {input_file} by column: {sort_key}")
 
@@ -311,14 +312,17 @@ def sortFile(input_file, sort_key):
                 log.error("Sort key must be a string (column name) or an integer (index).")
                 sys.exit(1)
                 
+        os.makedirs("backups", exist_ok=True)
+
         # Step 2: Chunk → Sort → Write
         temp_files = process_chunk(input_file, col_index)
 
         # Step 3: Merge sorted chunks
-        sorted_path = "sorted_output.csv"
+        sorted_path = "sorted_file.csv"
         merge_chunks(temp_files, sorted_path, col_index, headers)
 
         # Step 4: Replace original file (with backup)
+        
         safelyReplaceFile(input_file, sorted_path, backup=True)
 
         # Step 5: Cleanup
@@ -331,18 +335,49 @@ def sortFile(input_file, sort_key):
         sys.exit(1)
 # ────────────────────────────────────────────────────────────
 
-def filterNewUsers():
-    """  """
-    pass
+def filterNewUsers(old_file, new_file, col_index):
+    """ Filter New add users.
+    - all IDs which is in the new csv file but to in onld csv file these entries are users.
+    """
+    with open(old_file, 'r', newline='') as oldf, open( new_file, 'r' , newline='') as newf:
 
+        reader4oldf = csv.reader(oldf)
+        reader4newf = csv.reader(newf)
+
+        oldf_headers = next(reader4oldf)
+        newf_headers = next(reader4newf)
+
+        old_set = set()
+        for rw in reader4oldf:
+            old_set.add(rw[0].strip())
+
+        new_users = []
+        for row in reader4newf:
+            if row[0].strip() not in old_set:
+                new_users.append(row)
+
+        # newUsersCsv = os.path.join("data","csv","new_users.csv")
+        newUsersCsv = '../data/csv/new_users.csv'
+        with open(newUsersCsv, "w", newline='', encoding='utf-8') as out:
+            writer = csv.writer(out)
+            writer.writerow(newf_headers)
+            writer.writerows(new_users)
+        log.info(f"NEW USER FILE HAS WRITTEN  at : {newUsersCsv}")
 # ──────────────────────────────
 
 def filterUpdatedUsers():
+    """ Filter users which have changes in data.
+    - All modified user are filted. i.e. they dont have new entry but have changes
+         in old column valu with compare to new column value.    
+    """
     pass
 
 # ──────────────────────────────
 
 def fltereDisableUsers():
+    """Filter user which are common in both file. 
+    
+    """
     pass
 
 # ──────────────────────────────
@@ -370,12 +405,12 @@ def main(oldFile, newFile):
     # input file and sort key.
     sort_key = "ID"
     sortFile(oldFile, sort_key)
-    sortFile(newFile, sort_key)
-
+    # sortFile(newFile, sort_key)
+    filterNewUsers(oldFile, newFile, "ID")
 # ──────────────────────────────
 
 if __name__ == "__main__":
-    oldFile='../data/csv/1000row.csv'
+    oldFile='../data/csv/oldFile.csv'
     newFile='../data/csv/newFile.csv'
 
     main(oldFile, newFile)
