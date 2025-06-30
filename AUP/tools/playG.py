@@ -1,35 +1,3 @@
-""" 
--> This is a TOOL. It used to find difference in two csv file at column level, column order level, row level and row value level.
-
-@Prams:
-    OldFile: Path of the old csv file
-    NewFile: Path of the new csv file
-
-What tool does?
--> Pre-tasks:
-    - short the both files by id column.
-
-Task - 1 : compare CSV at column header level
-    -> Q: Are there any new columns in the new CSV that are not in the old CSV?
-    Do: Report new column added, with filename, column name, position and value.
-    
-    -> Q: Are there any sequence changes in new CSV compare to old CSV?
-    Do: Report the changes in sequence with old order and new order.
-
-if no changes in columns move to check row level change.
-
-Task - 2 :compare Id columns in both file if any new Id found in new file then save this entire row in new jsonFile with ID
-
-Task - 3 : Comapre row by row with column value.
-    -> like: 
-        Row-1:
-            is oldCol val == newCol val for each cols in a row.
-            if change in a single column then add it in jsonFile. 
-
-        jsonFile : key = rowIndex:colIndex and value = [{"col1":"val1", "col2":"val2", "col3":"val3"}]
-
-"""
-
 import os 
 import sys
 import csv
@@ -286,11 +254,18 @@ def cleanup(temp_files):
         except Exception as e:
             log.error(f"Failed to delete temp file {path}: {e}")
 
+    extras = ['../data/csv/add_users.csv', '../data/csv/update_users.csv',  '../data/csv/disable_users.csv' ]
+    for path in extras:
+        try: 
+            os.remove(path) if os.path.exists(path) else None
+            log.info(f"existing file '{path}' removed")
+        except Exception as e:
+            log.error(f"Failed to delete temp file {path}: {e}")
+
 #main for sort files
 def sortFile(input_file, sort_key):
     global COL_KY_DTYP
     COL_KY_DTYP = infer_column_type(input_file, sort_key)
-    print(COL_KY_DTYP)
     try:
         log.info(f"Starting sorting on file: {input_file} by column: {sort_key}")
 
@@ -344,7 +319,6 @@ def filterNewUsers(old_file, new_file, col_index):
         reader4oldf = csv.reader(oldf)
         reader4newf = csv.reader(newf)
 
-        oldf_headers = next(reader4oldf)
         newf_headers = next(reader4newf)
 
         old_set = set()
@@ -356,29 +330,70 @@ def filterNewUsers(old_file, new_file, col_index):
             if row[0].strip() not in old_set:
                 new_users.append(row)
 
-        # newUsersCsv = os.path.join("data","csv","new_users.csv")
-        newUsersCsv = '../data/csv/new_users.csv'
-        with open(newUsersCsv, "w", newline='', encoding='utf-8') as out:
-            writer = csv.writer(out)
-            writer.writerow(newf_headers)
-            writer.writerows(new_users)
-        log.info(f"NEW USER FILE HAS WRITTEN  at : {newUsersCsv}")
+    # newUsersCsv = os.path.join("data","csv","new_users.csv")
+    addUsersCsv = '../data/csv/add_users.csv'
+    with open(addUsersCsv, "w", newline='', encoding='utf-8') as out:
+        writer = csv.writer(out)
+        writer.writerow(newf_headers)
+        writer.writerows(new_users)
+    log.info(f"NEW USER FILE HAS WRITTEN  at : {addUsersCsv}")
 # ──────────────────────────────
 
-def filterUpdatedUsers():
+def filterUpdatedUsers(olf_file, new_file):
     """ Filter users which have changes in data.
     - All modified user are filted. i.e. they dont have new entry but have changes
          in old column valu with compare to new column value.    
     """
-    pass
+    with open(olf_file, 'r', newline='') as ofile, open(new_file, 'r', newline='') as nfile:
+        old_reader = csv.reader(ofile)
+        new_reader = csv.reader(nfile)
 
+        old_headers = next(old_reader)
+        next(new_reader)
+
+        old_ids = {rw[0].strip(): rw for rw in old_reader}
+        updated_rows = []
+
+        
+        for rw in new_reader:
+            ID = rw[0].strip()
+            if ID in old_ids:
+                full_row = old_ids[ID]
+
+                for i, (old_val, new_val) in enumerate(zip(full_row[1:], rw[1:]), start=1):
+                    if old_val != new_val:
+                        col_name = old_headers[i]
+                        log.info(f"User ID {ID} → Field changed: '{col_name}' | Old: '{old_val}' → New: '{new_val}'")
+                        updated_rows.append(rw) if rw not in updated_rows else None
+
+        updateUsersCsv = '../data/csv/update_users.csv'
+        with open(updateUsersCsv, 'w', newline='') as updatefile:
+            writer = csv.writer(updatefile)
+            writer.writerow(old_headers)
+            writer.writerows(updated_rows)
+        log.info(f"Update user file has written at : {updateUsersCsv}")
 # ──────────────────────────────
 
-def fltereDisableUsers():
+def filterDisableUsers(old_file, new_file):
     """Filter user which are common in both file. 
-    
+    the ids which are not in the old file but in the new file.
     """
-    pass
+    with open(old_file, 'r', newline='') as ofile, open(new_file, 'r', newline='') as nfile:
+        old_reader = csv.reader(ofile)
+        new_reader = csv.reader(nfile)
+
+        old_headers = next(old_reader)
+        next(new_reader)
+
+        new_ids = set(rw[0].strip() for rw in new_reader)
+        disable_users = [rw for rw in old_reader if rw[0].strip() not in new_ids]
+        
+    disableUsersCsv = '../data/csv/disable_users.csv'
+    with open(disableUsersCsv, 'w', newline='') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerow(old_headers)
+        writer.writerows(disable_users)
+    log.info(f"Disable users file has created at {disableUsersCsv}")
 
 # ──────────────────────────────
 
@@ -391,11 +406,9 @@ def main(oldFile, newFile):
     with open(oldFile, 'r', newline='') as f:
         reader = csv.reader(f)
         oldFileColHeaders = next(reader)
-        oldFileData = [row for row in reader]
     with open(newFile, 'r') as f:
         reader = csv.reader(f)
         newFileColHeaders = next(reader)
-        newFileData = [row for row in reader]
     
     # cheking if both files have same headers
     has_valid_headers= headerValidation(oldFileColHeaders, newFileColHeaders)
@@ -405,8 +418,10 @@ def main(oldFile, newFile):
     # input file and sort key.
     sort_key = "ID"
     sortFile(oldFile, sort_key)
-    # sortFile(newFile, sort_key)
+    sortFile(newFile, sort_key)
     filterNewUsers(oldFile, newFile, "ID")
+    filterUpdatedUsers(oldFile, newFile)
+    filterDisableUsers(oldFile, newFile)
 # ──────────────────────────────
 
 if __name__ == "__main__":
