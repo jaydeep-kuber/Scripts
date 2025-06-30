@@ -1,4 +1,8 @@
 /data
 /sh
+/tools/logs
+
 *.csv
 *.txt
+*.log
+*.bck
