@@ -102,18 +102,6 @@ def headerValidation(oldFileHeaders, newFileHeaders):
 
 
 # ──────────────────────────────VALIDATE SORTED FILE──────────────────────────────
-
-def validate_final_csv(input_file, output_file):
-    """Validate that input and output have the same number of rows."""
-    
-    log.info("Validating number of rows in file after sorting...")
-
-    input_rows = sum(1 for _ in open(input_file)) - 1  # Exclude header
-    output_rows = sum(1 for _ in open(output_file)) - 1
-    if input_rows != output_rows:
-        raise ValueError(f"Data loss detected: Input has {input_rows} rows, output has {output_rows} rows")
-    log.info(f"Validation passed: {input_rows} rows in both input and output")
-
 def compute_checksum(file_path):
     """Compute MD5 checksum of a file for extra validation."""
     
@@ -417,8 +405,23 @@ def main(oldFile, newFile):
     # sort file
     # input file and sort key.
     sort_key = "ID"
+    # before sorting compute checksum of files
+    oldFile_checksum = compute_checksum(oldFile)
+    newFile_checksum = compute_checksum(newFile)
+
     sortFile(oldFile, sort_key)
     sortFile(newFile, sort_key)
+
+    # after sorting compute checksum
+    oldFile_sorted_checksum = compute_checksum(oldFile)
+    newFile_sorted_checksum = compute_checksum(newFile)
+
+    # checking if file corrupted or not.
+    if oldFile_checksum == oldFile_sorted_checksum and newFile_checksum == newFile_sorted_checksum: 
+        log.info("sorted file check sum matched, file not corrupted...")
+    else:
+        sys.exit("Checksum mismatch, file corrupted...")
+
     filterNewUsers(oldFile, newFile, "ID")
     filterUpdatedUsers(oldFile, newFile)
     filterDisableUsers(oldFile, newFile)
