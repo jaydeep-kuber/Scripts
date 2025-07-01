@@ -50,26 +50,25 @@ def fileValidation(oldFile, newFile):
 
     #check is file is exist
     if not os.path.isfile(oldFile):
-        log.info("Old file not found")
+        log.error("Old file not found")
         return False
     if not os.path.isfile(newFile):
-        log.info("New file not found")
+        log.error("New file not found")
         return False
 
     #check if file is empty
     if os.path.getsize(oldFile) == 0:
-        log.info("Old file is empty")
+        log.error("Old file is empty")
         return False
     if os.path.getsize(newFile) == 0:
-        log.info("New file is empty")
+        log.error("New file is empty")
         return False
 
     #check if file is csv
     if not oldFile.endswith('.csv') or not newFile.endswith('.csv'):
-        log.info("File is not csv")
+        log.error("File is not csv")
         return False
 
-    log.info("File validation end..")
     return True
 
 def headerValidation(oldFileHeaders, newFileHeaders):
@@ -82,7 +81,7 @@ def headerValidation(oldFileHeaders, newFileHeaders):
     log.info("Header validation start...")
 
     if len(oldFileHeaders) != len(newFileHeaders):
-        log.info(f"Header length mismatch:\nOld file: {len(oldFileHeaders)}\nNew file: {len(newFileHeaders)}\n")
+        log.error(f"Header length mismatch:\nOld file: {len(oldFileHeaders)}\nNew file: {len(newFileHeaders)}\n")
         return False
 
     mismatches = []
@@ -92,12 +91,11 @@ def headerValidation(oldFileHeaders, newFileHeaders):
             mismatches.append((i, oldFileHeaders[i], newFileHeaders[i]))
 
     if mismatches:
-        log.info("Header mismatches found:")
+        log.error("Header mismatches found:")
         for idx, old, new in mismatches:
             log.info(f"  Index {idx}: '{old}' != '{new}'")
         return False
     
-    log.info("Header validation end...")
     return True
 
 
@@ -105,7 +103,7 @@ def headerValidation(oldFileHeaders, newFileHeaders):
 def compute_checksum(file_path):
     """Compute MD5 checksum of a file for extra validation."""
     
-    log.info("Computing checksum for validation, is file corrupted..")
+    log.debug("Computing checksum for validation, is file corrupted..")
     
     hash_md5 = hashlib.md5()
     with open(file_path, "rb") as f:
@@ -127,7 +125,7 @@ def infer_column_type(file_path, column_name):
         reader = list(csv.DictReader(csvfile))
 
         if column_name not in reader[0].keys():
-            print("Columnn is not Exist")
+            log.error("Columnn is not Exist")
             return
 
     if len(reader) < 10:
@@ -185,7 +183,7 @@ def process_chunk(filePath, col_index):
                 temp_files.append(temp.name)
                 temp.close()
                 rows = []
-                log.info(f"processing done for chunk: {chunk_counter+1}")
+                log.debug(f"processing done for chunk: {chunk_counter+1}")
                 chunk_counter += 1
             
 
@@ -197,7 +195,7 @@ def process_chunk(filePath, col_index):
             writer.writerows(rows)
             temp_files.append(temp.name)
             temp.close()
-            log.info(f"processing done for chunk: {chunk_counter+1}")
+            log.debug(f"processing done for chunk: {chunk_counter+1}")
 
     log.info(f"Chunking process done")
     return temp_files
@@ -224,37 +222,39 @@ def merge_chunks(temp_files, output_path, col_index, headers):
 
     for fh in file_handles:
         fh.close()
+    log.info("Merging is done...")
 
 def safelyReplaceFile(original_path, sorted_path, backup=True):
     log.info(f"Your have set backup option: {backup}")
     if backup:
         backup_path = os.path.join("backups", f"{os.path.basename(original_path)}.bck")
         shutil.copy2(original_path, backup_path)
-        log.info(f"backup done, file stored at: {backup_path}")
+        log.debug(f"backup done, file stored at: {backup_path}")
     shutil.move(sorted_path, original_path)
     log.info("New sorted file override.")
 
 
-def cleanup(temp_files):
+def cleanup(temp_files, prefix):
     for path in temp_files:
         try:
             os.remove(path)
         except Exception as e:
             log.error(f"Failed to delete temp file {path}: {e}")
 
-    extras = ['../data/csv/add_users.csv', '../data/csv/update_users.csv',  '../data/csv/disable_users.csv' ]
+    extras = [f'../data/csv/{prefix}_addUsers.csv', f'../data/csv/{prefix}_updateUsers.csv',  f'../data/csv/{prefix}_disableUsers.csv' ]
     for path in extras:
         try: 
             os.remove(path) if os.path.exists(path) else None
-            log.info(f"existing file '{path}' removed")
+            log.debug(f"existing file '{path}' removed")
         except Exception as e:
             log.error(f"Failed to delete temp file {path}: {e}")
 
 #main for sort files
-def sortFile(input_file, sort_key):
+def sortFile(input_file, sort_key, prefix):
     global COL_KY_DTYP
     COL_KY_DTYP = infer_column_type(input_file, sort_key)
     try:
+        log.info(f"------------------------------------------------------------")
         log.info(f"Starting sorting on file: {input_file} by column: {sort_key}")
 
         # Step 1: Validate and get headers
@@ -289,19 +289,21 @@ def sortFile(input_file, sort_key):
         safelyReplaceFile(input_file, sorted_path, backup=True)
 
         # Step 5: Cleanup
-        cleanup(temp_files)
+        cleanup(temp_files, prefix)
 
         log.info("Sorting completed successfully.")
 
     except Exception as e:
-        log.exception(f"Unexpected error occurred: {e}")
+        log.error(f"Unexpected error occurred: {e}")
         sys.exit(1)
 # ────────────────────────────────────────────────────────────
 
-def filterNewUsers(old_file, new_file, col_index):
+def filterNewUsers(old_file, new_file, prefix, col_index):
     """ Filter New add users.
     - all IDs which is in the new csv file but to in onld csv file these entries are users.
     """
+    log.info(f"------------------------------------------------------------")
+    log.info("Filtering new users...")
     with open(old_file, 'r', newline='') as oldf, open( new_file, 'r' , newline='') as newf:
 
         reader4oldf = csv.reader(oldf)
@@ -319,19 +321,21 @@ def filterNewUsers(old_file, new_file, col_index):
                 new_users.append(row)
 
     # newUsersCsv = os.path.join("data","csv","new_users.csv")
-    addUsersCsv = '../data/csv/add_users.csv'
+    addUsersCsv = f'../data/csv/{prefix}_addUsers.csv'
     with open(addUsersCsv, "w", newline='', encoding='utf-8') as out:
         writer = csv.writer(out)
         writer.writerow(newf_headers)
         writer.writerows(new_users)
-    log.info(f"NEW USER FILE HAS WRITTEN  at : {addUsersCsv}")
+    log.info(f"Add user file hase written at : {addUsersCsv}")
 # ──────────────────────────────
 
-def filterUpdatedUsers(olf_file, new_file):
+def filterUpdatedUsers(olf_file, new_file, prefix):
     """ Filter users which have changes in data.
     - All modified user are filted. i.e. they dont have new entry but have changes
          in old column valu with compare to new column value.    
     """
+    log.info(f"------------------------------------------------------------")
+    log.info("Filtering updated users...")
     with open(olf_file, 'r', newline='') as ofile, open(new_file, 'r', newline='') as nfile:
         old_reader = csv.reader(ofile)
         new_reader = csv.reader(nfile)
@@ -341,7 +345,6 @@ def filterUpdatedUsers(olf_file, new_file):
 
         old_ids = {rw[0].strip(): rw for rw in old_reader}
         updated_rows = []
-
         
         for rw in new_reader:
             ID = rw[0].strip()
@@ -351,10 +354,10 @@ def filterUpdatedUsers(olf_file, new_file):
                 for i, (old_val, new_val) in enumerate(zip(full_row[1:], rw[1:]), start=1):
                     if old_val != new_val:
                         col_name = old_headers[i]
-                        log.info(f"User ID {ID} → Field changed: '{col_name}' | Old: '{old_val}' → New: '{new_val}'")
+                        log.debug(f"User ID {ID} → Field changed: '{col_name}' | Old: '{old_val}' → New: '{new_val}'")
                         updated_rows.append(rw) if rw not in updated_rows else None
 
-        updateUsersCsv = '../data/csv/update_users.csv'
+        updateUsersCsv = f'../data/csv/{prefix}_updateUsers.csv'
         with open(updateUsersCsv, 'w', newline='') as updatefile:
             writer = csv.writer(updatefile)
             writer.writerow(old_headers)
@@ -362,10 +365,12 @@ def filterUpdatedUsers(olf_file, new_file):
         log.info(f"Update user file has written at : {updateUsersCsv}")
 # ──────────────────────────────
 
-def filterDisableUsers(old_file, new_file):
+def filterDisableUsers(old_file, new_file, prefix):
     """Filter user which are common in both file. 
     the ids which are not in the old file but in the new file.
     """
+    log.info(f"------------------------------------------------------------")
+    log.info("Filtering disable users...")
     with open(old_file, 'r', newline='') as ofile, open(new_file, 'r', newline='') as nfile:
         old_reader = csv.reader(ofile)
         new_reader = csv.reader(nfile)
@@ -376,7 +381,7 @@ def filterDisableUsers(old_file, new_file):
         new_ids = set(rw[0].strip() for rw in new_reader)
         disable_users = [rw for rw in old_reader if rw[0].strip() not in new_ids]
         
-    disableUsersCsv = '../data/csv/disable_users.csv'
+    disableUsersCsv = f'../data/csv/{prefix}_disableUsers.csv'
     with open(disableUsersCsv, 'w', newline='') as outfile:
         writer = csv.writer(outfile)
         writer.writerow(old_headers)
@@ -385,7 +390,7 @@ def filterDisableUsers(old_file, new_file):
 
 # ──────────────────────────────
 
-def main(oldFile, newFile):    
+def main(oldFile, newFile, prefix):    
     # cheking validation
     is_valid = fileValidation(oldFile,newFile)
     log.info("file Validation Complete") if is_valid else sys.exit("Validation Failed")            
@@ -409,8 +414,8 @@ def main(oldFile, newFile):
     oldFile_checksum = compute_checksum(oldFile)
     newFile_checksum = compute_checksum(newFile)
 
-    sortFile(oldFile, sort_key)
-    sortFile(newFile, sort_key)
+    sortFile(oldFile, sort_key, prefix)
+    sortFile(newFile, sort_key, prefix)
 
     # after sorting compute checksum
     oldFile_sorted_checksum = compute_checksum(oldFile)
@@ -418,17 +423,18 @@ def main(oldFile, newFile):
 
     # checking if file corrupted or not.
     if oldFile_checksum == oldFile_sorted_checksum and newFile_checksum == newFile_sorted_checksum: 
+        log.info(f"------------------------------------------------------------")
         log.info("sorted file check sum matched, file not corrupted...")
     else:
         sys.exit("Checksum mismatch, file corrupted...")
 
-    filterNewUsers(oldFile, newFile, "ID")
-    filterUpdatedUsers(oldFile, newFile)
-    filterDisableUsers(oldFile, newFile)
+    filterNewUsers(oldFile, newFile,prefix, "ID")
+    filterUpdatedUsers(oldFile, newFile, prefix)
+    filterDisableUsers(oldFile, newFile, prefix)
 # ──────────────────────────────
 
 if __name__ == "__main__":
     oldFile='../data/csv/oldFile.csv'
     newFile='../data/csv/newFile.csv'
-
-    main(oldFile, newFile)
+    prefix = "20250701"
+    main(oldFile, newFile, prefix)
