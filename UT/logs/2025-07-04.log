@@ -1,0 +1,10 @@
+2025-07-03 10:00:01 [INFO] web: Starting application
+2025-07-03 10:01:22 [INFO] api: Health check passed
+2025-07-03 10:02:47 [ERROR] backend: Database connection failed
+2025-07-03 10:03:12 [INFO] keycloak: Token issued successfully
+2025-07-03 10:04:05 [WARN] api: Request took longer than expected
+2025-07-03 10:05:33 [ERROR] web: Uncaught exception in handler
+2025-07-03 10:06:10 [INFO] backend: Retry succeeded
+2025-07-03 10:07:54 [INFO] keycloak: User login successful
+2025-07-03 10:08:15 [CRITICAL] api: Memory limit exceeded
+2025-07-03 10:09:01 [INFO] web: Shutting down
