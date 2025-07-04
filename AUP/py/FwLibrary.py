@@ -37,12 +37,12 @@ def setCompanyOnHold(filePath, CONFIG, cid):
     return 1       
 
 def DiffChecker(prevFile, userFile, threshold, location, cid, cName):
-    diff_current_count=0;
-    diff_previous_count=0;
-    diff_count=0;
-    diffRatio=0;
-    myT=threshold;
-    server=location;
+    diff_current_count=0
+    diff_previous_count=0
+    diff_count=0
+    diffRatio=0
+    myT=threshold
+    server=location
     CONFIG=Path("/home/ubuntu/allegoAdmin/scripts/prod.json")
     
     cid = cid
@@ -148,8 +148,8 @@ def DiffChecker(prevFile, userFile, threshold, location, cid, cName):
         diff_ratio = 0  
 
     if diff_ratio > myT:
-        CASE_3_SUBJECT=f"AUP Changeset Warning-Too many general changes: ${cName} ${DATE}";
-        CASE_3_BODY=f"Too many changes detected for company ${cName}. ${diffRatio} percent of the file requires updating, which is greater than the current threshold value of ${myT} percent.";
+        CASE_3_SUBJECT=f"AUP Changeset Warning-Too many general changes: ${cName} ${DATE}"
+        CASE_3_BODY=f"Too many changes detected for company ${cName}. ${diffRatio} percent of the file requires updating, which is greater than the current threshold value of ${myT} percent."
 
         sendMail(
                 FROM="email-admin@allego.com",
