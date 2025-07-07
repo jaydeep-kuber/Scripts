@@ -103,7 +103,7 @@ def config_loader(path):
 if __name__ == "__main__":
     
     REGION = 'ap-south-1'
-    QUEUE_URL = "https://sqs.ap-south-1.amazonaws.com/559050252971/PracticeSqs-std"
+    QUEUE_URL = ""
     sqs = boto3.client('sqs', region_name=REGION)
     
     # --- Config ---
