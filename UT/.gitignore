@@ -1,4 +1,5 @@
 *.txt
 /venv
 *.env
-.env
+config.json
+/logs
