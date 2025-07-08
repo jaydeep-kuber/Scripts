@@ -1,0 +1,16 @@
+[Unit]
+Description=Log Watcher Service for Multiple Containers
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/path/to/project/name-of-venv/bin/python3 /path/to/project/logWatcher.py /path/to/conffile/config.json
+WorkingDirectory=/path/to/project
+User=Ubuntu
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/logwatcher/service.log
+StandardError=append:/var/log/logwatcher/error.log
+
+[Install]
+WantedBy=multi-user.target

@@ -21,19 +21,14 @@ file_cursors = {}
 
 # Extras
 def makefile():
-    # TODAY = datetime.now().strftime("%Y-%m-%d")
-    containers = ["soil-api-gateway", "soil-okr"]
-    for container in containers:
-        os.makedirs(f"{LOG_ROOT}/{container}", exist_ok=True) if not os.path.exists(f"{LOG_ROOT}/{container}") else print("Directory exist")
-        fileName = f"{container}_.log"
-        file = os.path.join(f"{LOG_ROOT}/{container}", fileName)
+    for file in LOG_FILES:        
         open(file, "w").close() if not os.path.exists(file) else print("file is there")
 
-#main
+# #main
 def send_to_sqs(message):
     try:
         sqs.send_message(
-            QueueUrl=QUEUE_URL,
+            QueueUrl=SQS_URL,
             MessageBody=json.dumps({"log": message})
         )
         print(f"Sent to SQS: {message}")
@@ -76,17 +71,14 @@ def start_monitoring():
     observer = Observer()
     handler = LogChangeHandler()
 
-    for container in CONTAINERS:
-        log_dir = os.path.join(LOG_ROOT, container)
-        today_file = os.path.join(log_dir, f"{container}_.log")
-
-        if not os.path.exists(today_file):
-            print(f"Log file not found: {today_file}")
+    for file in LOG_FILES:
+        if not os.path.exists(file):
+            print(f"Log file not found: {file}")
             continue
 
-        file_cursors[today_file] = os.path.getsize(today_file)
-        observer.schedule(handler, path=log_dir, recursive=False)
-        print(f"Watching: {today_file}")
+        file_cursors[file] = os.path.getsize(file)
+        observer.schedule(handler, path=file, recursive=False)
+        print(f"Watching: {file}")
 
     observer.start()
     try:
@@ -98,22 +90,28 @@ def start_monitoring():
 
 def config_loader(path):
     print("please provide a .json file") if not path.endswith(".json") else None
+    print("404: file not found... may you have mistak in path") if not os.path.exists(path)  else None
+    
+    #open json file
+    with open(path, 'r') as f:
+        configs = json.load(f)
+    
+    global REGION, SQS_URL, LOG_FILES
+    REGION = configs['REGION']
+    SQS_URL = configs['SQS_URL']
+    LOG_FILES = configs['LOG_FILES']
 
+    return True
 
 if __name__ == "__main__":
     
-    REGION = 'ap-south-1'
-    QUEUE_URL = ""
-    sqs = boto3.client('sqs', region_name=REGION)
-    
-    # --- Config ---
-    LOG_ROOT = "/home/jay/work/scripts/UT/logs/"
-    CONTAINERS = ["soil-api-gateway", "soil-okr"]
-    TODAY = datetime.now().strftime("%Y-%m-%d")
-    LOG_PATTERN = re.compile(r'error|critical|fatal', re.IGNORECASE)
+    LOG_PATTERN = re.compile(r'error|critical|fatal|GET', re.IGNORECASE)
 
     config_path = sys.argv[1] if len(sys.argv) > 1 else sys.exit("Please provice a config.json in first arg...")
     print(f"Configuring from: {config_path} file")
     config_loader(config_path)
+    
+    # sqs client
+    sqs = boto3.client('sqs', region_name=REGION)    
+    makefile()
     start_monitoring()
-    # makefile()
