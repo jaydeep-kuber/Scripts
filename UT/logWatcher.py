@@ -8,9 +8,11 @@ import sys
 import time
 import boto3
 import json
+import logging
 from datetime import datetime
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from logging.config import dictConfig
 
 # --- File tracking ---
 """
@@ -24,16 +26,30 @@ def makefile():
     for file in LOG_FILES:        
         open(file, "w").close() if not os.path.exists(file) else print("file is there")
 
-# #main
+# main
+def setup_logging():
+    # open json file
+    with open('logging_conf.json', 'r') as f:
+        log_conf = json.load(f)
+
+    # auto configure logging dir
+    for handler in log_conf.get('handlers', {}).values():
+        if handler.get('class') == 'logging.FileHandler':
+            log_file = handler.get('filename')
+            if log_file:
+                os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    # apply logging configuration
+    dictConfig(log_conf)
+
 def send_to_sqs(message):
     try:
         sqs.send_message(
             QueueUrl=SQS_URL,
             MessageBody=json.dumps({"log": message})
         )
-        print(f"Sent to SQS: {message}")
+        logger.info(f"Message sent to SQS: {message}")
     except Exception as e:
-        print(f"Failed to send: {e}")
+        logger.error(f"Failed to send message with: {e}")
 
 def read_new_lines(filepath):
     """ 
@@ -70,15 +86,15 @@ class LogChangeHandler(FileSystemEventHandler):
 def start_monitoring():
     observer = Observer()
     handler = LogChangeHandler()
-
+    logger.info("Starting log file monitoring...")
     for file in LOG_FILES:
         if not os.path.exists(file):
-            print(f"Log file not found: {file}")
+            logger.warning(f"Log file not found: {file}")
             continue
 
         file_cursors[file] = os.path.getsize(file)
         observer.schedule(handler, path=file, recursive=False)
-        print(f"Watching: {file}")
+        logger.info(f"Monitoring: {file}")
 
     observer.start()
     try:
@@ -89,8 +105,8 @@ def start_monitoring():
     observer.join()
 
 def config_loader(path):
-    print("please provide a .json file") if not path.endswith(".json") else None
-    print("404: file not found... may you have mistak in path") if not os.path.exists(path)  else None
+    sys.exit("please provide a .json file") if not path.endswith(".json") else None
+    sys.exit("404: file not found... may you have mistak in path") if not os.path.exists(path)  else None
     
     #open json file
     with open(path, 'r') as f:
@@ -104,14 +120,16 @@ def config_loader(path):
     return True
 
 if __name__ == "__main__":
-    
+    setup_logging()
     LOG_PATTERN = re.compile(r'error|critical|fatal|GET', re.IGNORECASE)
-
+    logger = logging.getLogger("script")
     config_path = sys.argv[1] if len(sys.argv) > 1 else sys.exit("Please provice a config.json in first arg...")
-    print(f"Configuring from: {config_path} file")
-    config_loader(config_path)
-    
+    logger.info(f"Using configuring from: {config_path} file")
+
+    if config_loader(config_path):
     # sqs client
-    sqs = boto3.client('sqs', region_name=REGION)    
-    makefile()
-    start_monitoring()
+        sqs = boto3.client('sqs', region_name=REGION)    
+        start_monitoring()
+    else:
+        logger.error("Failed to load configuration.")
+        sys.exit(1)
