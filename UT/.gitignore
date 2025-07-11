@@ -3,3 +3,4 @@
 *.env
 config.json
 /logs
+__pycache__
