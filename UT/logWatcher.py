@@ -91,13 +91,21 @@ def read_new_lines(filepath):
 
     for line in new_lines:
         if TIMESTAMP_RE.search(line): # re for timestamp
-            if LOG_PATTERN.search(line):
-                sns.publish(
-                TopicArn=TOPIC_ARN,
-                Subject="🚨 Error Digest",
-                Message=line.strip()
-                )
-            
+            if TIMESTAMP_RE.search(line) and LOG_PATTERN.search(line): # re for error pattern
+                # If line has timestamp and matches error pattern 
+                error_q.put(line.strip())
+
+    process_error_queue()  # Process the error queue after reading new lines            
+
+def process_error_queue():
+    """ 
+        This function runs in a separate thread.
+        It processes the error queue and sends messages to SNS.
+    """
+    logger.info(f"Q size is: {error_q.qsize()}")
+    while not error_q.empty():
+        logger.info(f"{error_q.get(timeout=1)}")
+
 # --- Watchdog Handler ---
 class LogChangeHandler(FileSystemEventHandler):
     def on_modified(self, event):
