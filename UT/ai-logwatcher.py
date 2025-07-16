@@ -3,22 +3,23 @@ import re
 import sys
 import time
 import queue
-import boto3
 import json
 import logging
 import threading
-from datetime import datetime
+import subprocess
+from typing import AnyStr
+
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from logging.config import dictConfig
 
 # --- Global Configuration (Loaded from config.json) ---
 # These will be populated by config_loader
-REGION = None
-TOPIC_ARN = None
 LOG_FILES = []
 COOLDOWN = 60 # Default cooldown in seconds to prevent excessive notifications
-
+EMAIL_SENDER = ""
+EMAIL_APP_PASS = ""
+EMAIL_RECIPIENTS = ""
 # --- Regex Patterns ---
 # Timestamp pattern for lines that start with a date and time
 TIMESTAMP_RE = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}')
@@ -63,8 +64,7 @@ class LogMonitor:
     Manages the state and logic for monitoring log files,
     detecting errors, and sending notifications.
     """
-    def __init__(self, sns_client, logger):
-        self.sns_client = sns_client
+    def __init__(self, logger):
         self.logger = logger
         # A dictionary to remember the last position (offset),
         # current error buffer, and collection state for each log file.
@@ -79,27 +79,51 @@ class LogMonitor:
         self.error_processor_thread.start()
         self.logger.info("Error processing thread started.")
 
-    def _send_sns_notification(self, message):
-        """Sends a message to the configured AWS SNS topic."""
-        if self.cooldown_active:
-            # self.logger.info(f"SNS notification skipped due to cooldown. Message: {message[:100]}...")
-            self.logger.info("SNS notification skipped due to cooldown.")
-            return
+    def _send_smtp_notification(self, message):
+        """
+        Sends an email notification using SMTP.
+        This function is a placeholder for actual email sending logic.
+        """
+            # if self.cooldown_active:
+            #     return
+        subject = "Logwatcher Alert: Error Detected"
+        to = ','.join(EMAIL_RECIPIENTS)  # Join multiple recipients with commas
+        
+        # Construct command
+        cmd = f'echo "{message}" | mutt -s "{subject}" {to}'
+
+        # if attachment:
+        #     cmd += f' -a "{attachment}" --'
 
         try:
-            response = self.sns_client.publish(
-                TopicArn=TOPIC_ARN,
-                Message=message,
-                Subject="Log Monitoring Alert: Error Detected!"
-            )
-            self.logger.info(f"SNS notification sent successfully: {response['MessageId']}")
+            # Execute the command using shell
+            result = subprocess.run(cmd, shell=True, check=True)
+            
+            self.logger.info(f"Email notification sent...")
+            # Log mutt's output for debugging if needed
+            if result.stdout:
+                self.logger.debug(f"mutt stdout: {result.stdout.decode().strip()}")
+            if result.stderr:
+                self.logger.error(f"mutt stderr: {result.stderr.decode().strip()}")
+
+            # --- Cooldown Activation ---
             self.last_sent_time = time.time()
             self.cooldown_active = True
-            # Start a timer to reset cooldown_active after COOLDOWN seconds
+            # Assuming COOLDOWN is a global variable and _reset_cooldown is a method of this class
             self.cooldown_timer = threading.Timer(COOLDOWN, self._reset_cooldown)
             self.cooldown_timer.start()
+
+        # --- Error Handling ---
+        except subprocess.CalledProcessError as e:
+            # This catches errors where the mutt command itself failed (e.g., bad arguments, mutt not found, mutt couldn't send)
+            self.logger.error(f"Error sending email via mutt (exit code {e.returncode}): {e.stderr.decode().strip()}")
+        except FileNotFoundError:
+            # This specifically catches if the 'mutt' executable is not found in the system's PATH
+            self.logger.error("Error: 'mutt' command not found. Please ensure mutt is installed and in your system's PATH.")
         except Exception as e:
-            self.logger.error(f"Error sending SNS notification: {e}")
+            # Catch any other unexpected errors during the process
+            self.logger.error(f"An unexpected error occurred during email notification with mutt: {e}")
+
 
     def _reset_cooldown(self):
         """Resets the cooldown flag after the specified interval."""
@@ -116,7 +140,7 @@ class LogMonitor:
                 # Get a message from the queue with a timeout to allow the thread to be stopped
                 error_message = self.error_queue.get(timeout=1)
                 self.logger.info(f"Processing error from queue (Q size: {self.error_queue.qsize()}): {error_message[:100]}...")
-                self._send_sns_notification(error_message)
+                self._send_smtp_notification(error_message)
                 self.error_queue.task_done() # Mark the task as done
             except queue.Empty:
                 # No items in queue, continue loop
@@ -289,14 +313,12 @@ def start_monitoring(log_monitor_instance):
     for file_path in LOG_FILES:
         log_dir = os.path.dirname(file_path)
         if not os.path.exists(log_dir):
-            log_monitor_instance.logger.warning(f"Directory for log file not found: {log_dir}. Creating it.")
-            os.makedirs(log_dir, exist_ok=True)
-        
+            log_monitor_instance.logger.warning(f"Directory for log file not found: {log_dir}. skipping it...")
+            continue        
         # Create the log file if it doesn't exist, so watchdog can monitor it
         if not os.path.exists(file_path):
-            log_monitor_instance.logger.info(f"Log file not found: {file_path}. Creating an empty file.")
-            with open(file_path, 'a'): # 'a' creates file if it doesn't exist
-                pass
+            log_monitor_instance.logger.info(f"Log file not found: {file_path}. skipping it...")
+            continue
         
         # Initialize file state for existing files (or newly created empty ones)
         # This is crucial for the first read to skip old content
@@ -334,14 +356,17 @@ def config_loader(path):
         with open(path, 'r') as f:
             configs = json.load(f)
 
-        global REGION, TOPIC_ARN, LOG_FILES, COOLDOWN
-        REGION = configs.get('REGION')
-        TOPIC_ARN = configs.get('TOPIC_ARN')
-        LOG_FILES = configs.get('LOG_FILES', [])
-        COOLDOWN = configs.get('COOLDOWN_SECONDS', 60) # Use default if not provided
+        global LOG_FILES, COOLDOWN,EMAIL_SENDER,EMAIL_APP_PASS,EMAIL_RECIPIENTS
+        LOG_FILES = configs.get('log_files', [])
+        COOLDOWN = configs.get('cooldown_seconds', 60) # Use default if not provided
 
-        if not REGION or not TOPIC_ARN or not LOG_FILES:
-            sys.exit("Error: Missing 'REGION', 'TOPIC_ARN', or 'LOG_FILES' in config.json.")
+        email_configs = configs.get('email_config')
+        EMAIL_SENDER = email_configs['smtp_user']
+        EMAIL_APP_PASS = configs.get('smtp_pass')
+        EMAIL_RECIPIENTS = configs.get('email_recipients', [])
+
+        if not EMAIL_SENDER or not EMAIL_APP_PASS or not LOG_FILES:
+            sys.exit("Error: Missing SMTP configs, or 'LOG_FILES' in config.json.")
         if not isinstance(LOG_FILES, list) or not all(isinstance(f, str) for f in LOG_FILES):
             sys.exit("Error: 'LOG_FILES' must be a list of strings in config.json.")
 
@@ -366,14 +391,13 @@ if __name__ == "__main__":
     if config_loader(config_path):
         try:
             # Initialize SNS client
-            sns_client = boto3.client('sns', region_name=REGION)
             logger.info("SNS client created successfully.")
         except Exception as e:
             logger.error(f"Failed to create SNS client. Check AWS credentials and region: {e}")
             sys.exit(1)
 
         # Initialize LogMonitor instance
-        log_monitor = LogMonitor(sns_client, logger)
+        log_monitor = LogMonitor(logger)
 
         # Start monitoring
         start_monitoring(log_monitor)
