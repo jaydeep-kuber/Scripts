@@ -12,35 +12,56 @@ import  logging
 #custom imports
 from FwLibrary import diff_checker
 
-class Assume:
-    def __init__(self):
-        pass
+class FileMapManager:
+    def __init__(self, home_path: str):
+        self.home_path = Path(home_path).expanduser().resolve()
+        self.file_map = {} # {"filename":"path of file till dir"}
 
-    def create_csv_file(self, path):
-        open(path, 'w').close()
-        print(f"created csv file: {path}")
+    def add_file(self, filename: str , absolute_path: str):
+        """
+            Add a file-to-directory mapping.
+            Validates that filename has no slashes and path is not absolute.
+        """
 
-    def create_aup_script_file(self, path):
-        script_file = Path(path)
-        script_file.parent.mkdir(parents=True, exist_ok=True)
-        script_file.touch()
-        print(f"created AUP script file: {path}")
+        if '/' in filename:
+            raise ValueError("Filename must not contain slash, check your filename.")
+        if not Path(absolute_path).is_absolute():
+            raise ValueError("Expected absolute file path")
 
-    def clean_up(self):
-        print("cleaning up...")
-        os.system("rm -r ./home/*")
+        self.file_map[filename] = Path(absolute_path)
+        print(f"[+] Mapped '{filename}' → '{absolute_path}'")
+
+    def create_file(self):
+        """
+            Creates each file in the map under home_path/relative_dir.
+            Skips if the file already exists.
+        """
+        for file , dir_path in self.file_map.items():
+            full_path = os.path.join(dir_path, file)
+
+            dir_path.mkdir(parents=True, exist_ok=True)
+
+            if full_path.exists():
+                print(f"[*] Existing file: {full_path}")
+                continue
+            full_path.touch()
+
+
+def clean_up(self):
+    print("cleaning up...")
+    os.system("rm -r ./home/*")
     
-    def check_utf8(self, file_path: str) -> int:
-        print("Checking UTF8 format")
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                while f.read(1024):  # Read in chunks
-                    pass
-            print("UTF 8 Check Passed")
-            return 0
-        except UnicodeDecodeError:
-            print("UTF 8 Formatting has invalid characters; exiting")
-            sys.exit(1)
+def check_utf8(self, file_path: str) -> int:
+    print("Checking UTF8 format")
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            while f.read(1024):  # Read in chunks
+                pass
+        print("UTF 8 Check Passed")
+        return 0
+    except UnicodeDecodeError:
+        print("UTF 8 Formatting has invalid characters; exiting")
+        sys.exit(1)
 
 def load_env(file_path: str):
     """ this function is for loading ENV """
@@ -175,7 +196,6 @@ def generate_add_discard_files(current_csv, previous_csv, add_csv, discard_csv):
 def main():
     logging.getLogger(__name__)
     env_file_path= '../env/fwDevEnv.json'
-    assume = Assume()
     clean = input("Would you like to clean up after execution ? (yes/no): ")
     clean_up_flag = True if clean.lower() == 'yes' else False
 
@@ -234,7 +254,7 @@ def main():
             user_csv = os.path.join(upload_dir, f'{prefix}_users.csv')
             ########################################################################################
             # creating csv file
-            assume.create_csv_file(user_csv)
+            open(user_csv, 'w').close()
             #########################################################################################
             
             if not os.path.exists(user_csv):
@@ -244,7 +264,7 @@ def main():
                 print(f"your user_csv located at: {user_csv}")
 
             # checking utf-8 encoding
-            assume.check_utf8(user_csv)
+            check_utf8(user_csv)
 
             # FileWatcherExpressEnhancement Step 1
             # storing paths of previous_check , previous_manual_check
@@ -298,7 +318,10 @@ def main():
 
             ###########################################################################################
             script_file = './home/ubuntu/allegoAdmin/scripts/channels/AUPChannelUploader.py'
-            assume.create_aup_script_file(script_file)
+            script_file = Path(script_file)
+            script_file.parent.mkdir(parents=True, exist_ok=True)
+            script_file.touch()
+            print(f"created AUP script file: {script_file}")
             channel_id = str(env["channel_id"])
             py = 'python3'
             ##########################################################################################
@@ -348,10 +371,8 @@ def main():
             disable_csv = os.path.join(trgt_dir, company_name, "disable.csv")
 
             ################################################################################
-
-            assume.create_csv_file(add_update_csv) if not os.path.exists(add_update_csv) else None
-            assume.create_csv_file(disable_csv) if not os.path.exists(disable_csv) else None
-
+            open(add_update_csv, 'w').close() if not os.path.exists(add_update_csv) else None
+            open(disable_csv, 'w').close() if not os.path.exists(disable_csv) else None
             ################################################################################
 
             # rename both files to prevent overriding the data
@@ -507,7 +528,7 @@ def main():
 
     if clean_up_flag :
         # deleting all files in upload directory
-        assume.clean_up()
+        clean_up()
     print(f"========== script execution done ===========")
 
 main()
