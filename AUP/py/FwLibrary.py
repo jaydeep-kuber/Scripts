@@ -44,8 +44,8 @@ def diff_checker(prev_file, user_file, threshold, location, cid, cmp_name):
     temp_p = Path(f"/tmp/diff_previous_{cid}.csv") 
     temp_c = Path(f"/tmp/diff_current_{cid}.csv")
 
-    shutil.rmtree(temp_p) if os.path.exists(temp_p) else None
-    shutil.rmtree(temp_c) if os.path.exists(temp_c) else None
+    temp_p.unlink(missing_ok=True) if os.path.exists(temp_p) else None
+    temp_c.unlink(missing_ok=True) if os.path.exists(temp_c) else None
 
     # make empty 2 files
     temp_p.parent.mkdir(parents=True, exist_ok=True)
@@ -107,7 +107,7 @@ def diff_checker(prev_file, user_file, threshold, location, cid, cmp_name):
         else:
             print("Company hold file is present")
         ##################################################
-        set_company_on_hold(script_file, prod_config,cid)
+        set_company_on_hold(str(script_file), prod_config,cid)
         return 1
     
     # Failure Case 2: Lots of missing Rows, not based on updates, very sensitive.

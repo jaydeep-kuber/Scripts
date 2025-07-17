@@ -11,7 +11,7 @@
     "source_parent_dir":"./home/",
     "target_parent_dir":"./home/ubuntu/allegoAdmin/workdir/",
     "threshold":5,
-    "channelId":1,
+    "channel_id":1,
     "location": "192.168.1.2",
     "isEncrypted":1,
     "encryptionKey":"This1Is2Key3For4Enc5Dec6"

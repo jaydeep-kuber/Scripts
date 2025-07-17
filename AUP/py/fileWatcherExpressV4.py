@@ -7,6 +7,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from datetime import datetime
+import  logging
 
 #custom imports
 from FwLibrary import diff_checker
@@ -14,10 +15,6 @@ from FwLibrary import diff_checker
 class Assume:
     def __init__(self):
         pass
-    
-    def create_complete_file(self,path):
-        open(path, 'w').close()
-        print(f"created file: {path}")
 
     def create_csv_file(self, path):
         open(path, 'w').close()
@@ -176,7 +173,7 @@ def generate_add_discard_files(current_csv, previous_csv, add_csv, discard_csv):
     print("#################################[ add/discard files generated ]####################################")
 
 def main():
-    # default path
+    logging.getLogger(__name__)
     env_file_path= '../env/fwDevEnv.json'
     assume = Assume()
     clean = input("Would you like to clean up after execution ? (yes/no): ")
@@ -202,7 +199,7 @@ def main():
     print(len(all_companies))
     # iterating till value of number_of_company
     while index < number_of_company:
-        
+
         if env['number_of_company'] != len(all_companies):
             print(">>> number_of_company is not equal to number of companies in env file.")
             sys.exit(1)
@@ -220,8 +217,9 @@ def main():
 
         ########################################################################################
         # creating _complete file
-        complete_file = os.path.join(upload_dir, f'{company_name}_complete')
-        assume.create_complete_file(complete_file)
+        complete_file_name = f'{company_name}_complete'
+        complete_file = os.path.join(upload_dir, complete_file_name)
+        open(complete_file, 'w').close()
         ########################################################################################
 
         complete_file_path = [os.path.basename(file) for file in glob.glob(os.path.join(upload_dir, "*_complete"))]
@@ -314,7 +312,7 @@ def main():
 
             # Check estimated differences first CASE is based on exit codes. Skip if threshold = 101
             if threshold < 101:
-                percent = diff_checker(previous_file , user_csv , threshold, "location",company_id, cmp_name=company_name )
+                percent = diff_checker(previous_file , user_csv , threshold, "location",company_id, company_name )
                 
                 if percent == 1:
                     print("Diff Checker has stopped AUP")

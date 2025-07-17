@@ -16,7 +16,7 @@ from logging.config import dictConfig
 # --- Global Configuration (Loaded from config.json) ---
 # These will be populated by config_loader
 LOG_FILES = []
-COOLDOWN = 60 # Default cooldown in seconds to prevent excessive notifications
+COOLDOWN = 120 # Default cooldown in seconds to prevent excessive notifications
 EMAIL_SENDER = ""
 EMAIL_APP_PASS = ""
 EMAIL_RECIPIENTS = ""
@@ -139,7 +139,7 @@ class LogMonitor:
             try:
                 # Get a message from the queue with a timeout to allow the thread to be stopped
                 error_message = self.error_queue.get(timeout=1)
-                self.logger.info(f"Processing error from queue (Q size: {self.error_queue.qsize()}): {error_message[:100]}...")
+                self.logger.info(f"Processing error from queue (Q size: {self.error_queue.qsize()}): {error_message[:20]}...")
                 self._send_smtp_notification(error_message)
                 self.error_queue.task_done() # Mark the task as done
             except queue.Empty:
@@ -204,16 +204,16 @@ class LogMonitor:
                         self._enqueue_error_block(filepath)
                     self.file_states[filepath]['collecting'] = False
                     self.file_states[filepath]['buffer'] = [] # Clear buffer
-                    self.logger.debug(f"Timestamped non-error line, stopped collecting: {line[:80]}...")
+                    self.logger.debug(f"Timestamped non-error line, stopped collecting: {line[:20]}...")
                 elif not is_timestamped:
                     # This line has no timestamp, so it's likely a continuation of a previous log entry
                     if self.file_states[filepath]['collecting']:
                         # Append to the current error buffer
                         self.file_states[filepath]['buffer'].append(line)
-                        self.logger.debug(f"Appended to error buffer: {line[:80]}...")
+                        self.logger.debug(f"Appended to error buffer: {line[:20]}...")
                     else:
                         # Ignore lines without timestamp and not part of an active error collection
-                        self.logger.debug(f"Ignored non-timestamped line (not collecting): {line[:80]}...")
+                        self.logger.debug(f"Ignored non-timestamped line (not collecting): {line[:20]}...")
 
             # After processing all new_lines, if still collecting, enqueue the final block
             if self.file_states[filepath]['collecting'] and self.file_states[filepath]['buffer']:
@@ -232,7 +232,7 @@ class LogMonitor:
         if self.file_states[filepath]['collecting'] and self.file_states[filepath]['buffer']:
             full_error_message = "\n".join(self.file_states[filepath]['buffer'])
             self.error_queue.put(full_error_message)
-            self.logger.info(f"Enqueued error block (length {len(full_error_message)}): {full_error_message[:200]}...")
+            self.logger.info(f"Enqueued error block (length {len(full_error_message)}): {full_error_message[:50]}...")
             # Reset buffer and collecting state after enqueueing
             self.file_states[filepath]['buffer'] = []
             self.file_states[filepath]['collecting'] = False
@@ -347,6 +347,7 @@ def config_loader(path):
     Loads configuration from a JSON file.
     Populates global variables REGION, TOPIC_ARN, LOG_FILES.
     """
+    logger.info(f"Loading configuration from: {path}")
     if not path.endswith(".json"):
         sys.exit("Error: Please provide a .json configuration file.")
     if not os.path.exists(path):
@@ -359,10 +360,17 @@ def config_loader(path):
         global LOG_FILES, COOLDOWN,EMAIL_SENDER,EMAIL_APP_PASS,EMAIL_RECIPIENTS
         LOG_FILES = configs.get('log_files', [])
         COOLDOWN = configs.get('cooldown_seconds', 60) # Use default if not provided
+        if not isinstance(COOLDOWN, int) or COOLDOWN <= 0:
+            sys.exit("Error: 'cooldown_seconds' must be a positive integer in config.json.")
+        else:
+            logger.info(f"Cooldown set to {COOLDOWN} seconds.")
 
         email_configs = configs.get('email_config')
+        if not email_configs or not isinstance(email_configs, dict):
+            sys.exit("Error: 'email_config' section is missing in config.json.")
+
         EMAIL_SENDER = email_configs['smtp_user']
-        EMAIL_APP_PASS = configs.get('smtp_pass')
+        EMAIL_APP_PASS = email_configs['smtp_pass']
         EMAIL_RECIPIENTS = configs.get('email_recipients', [])
 
         if not EMAIL_SENDER or not EMAIL_APP_PASS or not LOG_FILES:
@@ -389,13 +397,8 @@ if __name__ == "__main__":
 
     # Load configuration
     if config_loader(config_path):
-        try:
-            # Initialize SNS client
-            logger.info("SNS client created successfully.")
-        except Exception as e:
-            logger.error(f"Failed to create SNS client. Check AWS credentials and region: {e}")
-            sys.exit(1)
-
+        logger.info("Configuration loaded successfully.")
+       
         # Initialize LogMonitor instance
         log_monitor = LogMonitor(logger)
 
