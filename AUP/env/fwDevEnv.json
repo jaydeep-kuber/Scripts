@@ -6,10 +6,10 @@
                     "cmp_id":14
                 }      
     ],
-    "allego_home": "./home/ubuntu/allegoAdmin",
+    "allego_home": "/home/jay/work/scripts/AUP/home/ubuntu/allegoAdmin",
     "sleep_interval":60,
-    "source_parent_dir":"./home/",
-    "target_parent_dir":"./home/ubuntu/allegoAdmin/workdir/",
+    "source_parent_dir":"/home/jay/work/scripts/AUP/home/",
+    "target_parent_dir":"/home/jay/work/scripts/AUP/home/ubuntu/allegoAdmin/workdir/",
     "threshold":5,
     "channel_id":1,
     "location": "192.168.1.2",

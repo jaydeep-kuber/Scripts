@@ -6,3 +6,6 @@
 *.txt
 *.log
 *.bck
+
+*.log.*
+*/log*
