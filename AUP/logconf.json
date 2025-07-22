@@ -12,7 +12,7 @@
   "handlers": {
     "consol": {
       "class": "logging.StreamHandler",
-      "level": "DEBUG",
+      "level": "WARN",
       "formatter": "default"
     },
     "file": {

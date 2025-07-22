@@ -1,13 +1,16 @@
 import json
 import logging
 import sys
+import stat
+import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
-from py.FwLibrary import diff_checker
+# from py.FwLibrary import diff_checker
 
 ENV = {}
 
@@ -165,12 +168,185 @@ def utf8_check(file_path: Path) -> bool:
         logger.error(f"[ERROR] Unexpected error during UTF-8 check: {e}")
         return False
 
+def skip_header(src_path, dest_path):
+    with open(src_path, 'r', encoding='utf-8') as src_file:
+        lines = src_file.readlines()[1:]  # skip the first line
+    with open(dest_path, 'w', encoding='utf-8') as dest_file:
+        dest_file.writelines(lines)
+
+def dos2unix(path):
+    with open(path, 'rb') as file:
+        content = file.read()
+    content = content.replace(b'\r\n', b'\n')
+    with open(path, 'wb') as file:
+        file.write(content)
+
+def generate_add_update_csv(previous_file, current_file, output_file):
+    """
+    Generate addUpdate.csv: lines that are in current_file but not in previous_file.
+    """
+    # Convert paths to Path objects
+    previous_file = Path(previous_file)
+    current_file = Path(current_file)
+    output_file = Path(output_file)
+
+    try:
+        # Read and sort both files (strip newlines and spaces)
+        with previous_file.open('r', encoding='utf-8') as f:
+            previous_lines = sorted(set(line.strip() for line in f if line.strip()))
+
+        with current_file.open('r', encoding='utf-8') as f:
+            current_lines = sorted(set(line.strip() for line in f if line.strip()))
+
+        # Find lines that are in current but not in previous
+        add_update_lines = sorted(set(current_lines) - set(previous_lines))
+
+        # Write result
+        with output_file.open('w', encoding='utf-8') as f:
+            for line in add_update_lines:
+                f.write(line + '\n')
+
+        logger.info(f"[+] addUpdate written to: {output_file}")
+
+    except Exception as e:
+        logger.error(f"[!] Error generating addUpdate file: {e}")
+
+def generate_disable_file(previous_file, current_file, output_file):
+    """
+    Generate disable.csv: lines that were in previous_file but not in current_file.
+    """
+    previous_file = Path(previous_file)
+    current_file = Path(current_file)
+    output_file = Path(output_file)
+
+    try:
+        with previous_file.open('r', encoding='utf-8') as f:
+            previous_lines = sorted(set(line.strip() for line in f if line.strip()))
+
+        with current_file.open('r', encoding='utf-8') as f:
+            current_lines = sorted(set(line.strip() for line in f if line.strip()))
+
+        # Find lines that were removed (present in previous but not in current)
+        disabled_lines = sorted(set(previous_lines) - set(current_lines))
+
+        with output_file.open('w', encoding='utf-8') as f:
+            for line in disabled_lines:
+                f.write(line + '\n')
+
+        logger.info(f"[+] disable.csv written to: {output_file}")
+
+    except Exception as e:
+        logger.info(f"[!] Error generating disable file: {e}")
+
+def generate_manual_update_csv(previous_file, current_file, output_file):
+    """
+    Generate manual_update.csv containing lines present in current manual file but not in previous.
+    Then, remove the *_complete file after processing.
+    """
+    previous_file = Path(previous_file)
+    current_file = Path(current_file)
+    output_file = Path(output_file)
+
+    try:
+        # Read and sort unique lines from each file
+        with previous_file.open('r', encoding='utf-8') as f:
+            previous_lines = sorted(set(line.strip() for line in f if line.strip()))
+
+        with current_file.open('r', encoding='utf-8') as f:
+            current_lines = sorted(set(line.strip() for line in f if line.strip()))
+
+        # Get lines that are only in current file (new/updated)
+        new_lines = sorted(set(current_lines) - set(previous_lines))
+
+        # Write to output
+        with output_file.open('w', encoding='utf-8') as f:
+            for line in new_lines:
+                f.write(line + '\n')
+
+        logger.info(f"[+] manual_update.csv written to: {output_file}")
+
+    except Exception as e:
+        print(f"[!] Error during manual update generation: {e}")
+
+def make_sql_executable(sql_path: str) -> bool:
+    """
+    Ensure the .sql file exists, has a shebang, and is executable.
+    Returns True if ready to execute.
+    """
+    sql_file = Path(sql_path)
+    logger.info(f"Making: {sql_file} executable in 'make_sql_executable' func")
+    if not sql_file.exists():
+        raise FileNotFoundError(f"SQL file not found: {sql_path}")
+    if not sql_file.is_file():
+        raise ValueError(f"Not a valid file: {sql_path}")
+
+    # Read first line to check for shebang
+    with sql_file.open("r") as f:
+        first_line = f.readline().strip()
+
+    if not first_line.startswith("#!"):
+        raise ValueError(f"Missing shebang in {sql_path}. Got: {first_line}")
+
+    # Add executable permission if missing
+    st = os.stat(sql_path)
+    if not bool(st.st_mode & stat.S_IXUSR):
+        os.chmod(sql_path, st.st_mode | stat.S_IXUSR)
+
+    return True
+
+def run_sql_script(script_path: str, argument: str) -> str:
+    """
+    Run the SQL script with given argument using subprocess.
+    Returns stdout output.
+    Raises CalledProcessError if it fails.
+    """
+    script = Path(script_path)
+
+    # Add executable permission if missing
+    st = os.stat(script_path)
+    if not bool(st.st_mode & stat.S_IXUSR):
+        os.chmod(script_path, st.st_mode | stat.S_IXUSR)
+
+    if not script.exists():
+        raise FileNotFoundError(f"Script not found: {script_path}")
+    if not os.access(script_path, os.X_OK):
+        raise PermissionError(f"Script is not executable: {script_path}")
+
+    result = subprocess.run(
+        [str(script), argument],
+        capture_output=True,
+        text=True,
+        check=True  # raises CalledProcessError on failure
+    )
+    return result.stdout.strip()
+
+def run_shell_script(script_path: str, argument: str) -> str:
+    """
+    Run the shell script with given argument using subprocess.
+    Returns stdout output.
+    Raises CalledProcessError if it fails.
+    """
+    script = Path(script_path)
+
+    if not script.exists():
+        raise FileNotFoundError(f"Script not found: {script_path}")
+    if not os.access(script_path, os.X_OK):
+        raise PermissionError(f"Script is not executable: {script_path}")
+
+    result = subprocess.run(
+        [str(script), argument],
+        capture_output=True,
+        text=True,
+        check=True  # raises CalledProcessError on failure
+    )
+    return result.stdout.strip()
+
 def main():
     logfile_name = f"filewatcher.log.{datetime.now().strftime('%Y.%m.%d')}"
     setup_logging(logfile_name)
-    project_root = "/home/jay/work/scripts/AUP"
+    project_root = "/home/jay/work/scripts/AUP/"
 
-#--- Replicate server dir structure for local. [remove this block in dev/prod ] ---
+    #--- Replicate server dir structure for local. [remove this block in dev/prod ] ---
     server_home = "/home/jay/work/scripts/AUP/home/ubuntu/"
     # class object
     manager = FileMapManager(server_home)
@@ -204,24 +380,24 @@ def main():
     # clean files
     # manager.clean_up(['log.txt','log1.txt', 'log2.txt' ])
 
-# --- END ---
+    # --- END ---
 
-# --- From this point script is starting ---
+    # --- From this point script is starting ---
     logger.info(f"running filewatcher {datetime.now().strftime('%Y.%m.%d')}")
 
-# --- args ---
+    # --- args ---
     # Check for env_file argument
     if len(sys.argv) > 1:
         env_file = sys.argv[1]
         logger.debug(f"Using env file: {env_file}...")
 
-# --- threshold ---
+    # --- threshold ---
     # Default threshold if not set to 101 in order to ignore threshold functions
     # getting threshold value form.
     threshold = ENV.get('threshold') or 101
     logger.debug(f"Threshold is set to: {threshold}")
 
-# --- while loop ---
+    # --- while loop ---
     i = 0
     while i < ENV.get("number_of_company"):
         logger.info(f"checking {i}, {datetime.now()}")
@@ -234,12 +410,14 @@ def main():
         # number of company and company in list are same?
         logger.warning("value of 'number_of_company' attribute and number of company resent in list are not same ") if ENV.get("number_of_company") != len(company_names) else None
 
-    # --- for loop ---
+        # --- for loop ---
         upload_dir = Path(src_upload_dir_lst[i])
         for idx, _cmp_file in enumerate(upload_dir.glob("*_complete")):
             file_name = _cmp_file.name
             prefix = file_name[:-9]  # Removes last 9 characters
             users_csv = upload_dir / f"{prefix}_users.csv"
+            manager.add_file( f"{prefix}_users.csv", str(upload_dir) )
+            manager.create_files()
 
             # --- utf8 ---
             users_csv = Path(users_csv)
@@ -252,7 +430,7 @@ def main():
                 case _:
                     logger.info(f"[INFO] Skipping UTF-8 check for company ID: {company_id}")
 
-        # --- FileWatcherExpressEnhancement Step 1 ---
+            # --- FileWatcherExpressEnhancement Step 1 ---
             target_parent_dir = ENV.get("target_parent_dir", ".")
             Path(target_parent_dir)
             channel_id = ENV.get("channel_id")
@@ -277,13 +455,13 @@ def main():
                 previous_manual_check.touch()
             else:
                 if previous_check.exists():
-                    logger.debug("A previous Users.csv run as been detected")
+                    logger.debug("A previous users.csv run as been detected")
                 else:
                     previous_check.touch()
                     logger.debug("Created blank Users.csv previous file for first run")
 
                 if previous_manual_check.exists():
-                    logger.debug("Created blank manual_Users.csv previous file for first run")
+                    logger.debug("A previous manual_users.csv run as been detected")
                 else:
                     previous_manual_check.touch()
                     logger.debug("Created blank manual_Users.csv previous file for first run")
@@ -303,8 +481,8 @@ def main():
 
             # Upload file to channel in AUP Company
             python_exe = "/usr/bin/python3"
-            script_path = "/home/ubuntu/allegoAdmin/scripts/channels/AUPChannelUploader.py"
-            users_csv = Path("/UPLOAD/client-218/users_complete")
+            script_path = f"{project_root}/home/ubuntu/allegoAdmin/scripts/channels/AUPChannelUploader.py"
+            # users_csv = Path(f"/UPLOAD/{company_name}/{company_name}_complete")
 
             # Run command
             result = subprocess.run(
@@ -337,7 +515,7 @@ def main():
                             logger.error(f"Failed to delete {file}: {e}")
 
                     # 2. Move users_csv to failure archive with prefix
-                    aup_failure_archive_path = target_parent_dir / "aupFailureArchive" / f"{prefix}_{company_name}"
+                    aup_failure_archive_path = Path(target_parent_dir) / "aupFailureArchive" / f"{prefix}_{company_name}"
                     try:
                         shutil.move(str(users_csv), str(aup_failure_archive_path))
                     except Exception as e:
@@ -348,11 +526,144 @@ def main():
 
         # --- End FileWatcherExpressEnhancement Step 1 ---
 
+        # --- This is not in script but to keep in safe side, I did here ---
+            backup_dir = Path(server_home) / "backup"
+            backup_dir.mkdir(parents=True ,exist_ok=True)
+            backup_csv = backup_dir / f"users.csv.{prefix}"
 
+            logger.info("Backup dir created in server home")
 
+            if users_csv.exists():
+                backup_csv.touch()
+                shutil.copy2(str(users_csv), str(backup_csv))
+                logger.info("user csv copied to backup folder.")
+                skip_header(str(backup_csv), f"{target_parent_dir}/{company_name}/users.csv" )
+                dos2unix(f"{target_parent_dir}/{company_name}/users.csv")
+
+            # --- FileWatcherExpressEnhancement Step 2 ---
+
+            manager.add_file("add_update.csv", f"{target_parent_dir}/{company_name}/" )
+            manager.add_file("disable.csv", f"{target_parent_dir}/{company_name}/" )
+            manager.create_files()
+
+            add_update_csv = Path(target_parent_dir) / company_name / "add_update.csv"
+            disable_csv = Path(target_parent_dir) / company_name / "disable.csv"
+
+            bck_add_update = backup_dir / f"add_update.csv.{prefix}"
+            bck_disable = backup_dir / f"disable.csv.{prefix}"
+
+            if add_update_csv.exists():
+                shutil.copy2(add_update_csv, bck_add_update)
+                logger.info("add_update csv copied to backup")
+            if disable_csv.exists():
+                shutil.copy2(disable_csv, bck_disable)
+                logger.info("disable csv copied to backup")
+
+            generate_add_update_csv(str(previous_file), f"{target_parent_dir}/{company_name}/users.csv",str(add_update_csv))
+            generate_disable_file(str(previous_file),f"{target_parent_dir}/{company_name}/users.csv", str(disable_csv) )
+        # --- End FileWatcherExpressEnhancement Step 2 ---
+        # Older implementation of groups.csb and userGroupMemberShip.csv
+
+            groups_csv = Path(upload_dir) / f"{prefix}_groups.csv"
+            user_group_membership_csv = Path(upload_dir) / f"{prefix}_user_group_membership.csv"
+            fbt_users_csv= Path(upload_dir) / f"{prefix}_fbt_users.csv" # sunovion Legacy implementation
+            manual_users_csv = upload_dir / f"{prefix}_manual_users.csv"  # Manual File Support
+
+            # Assuming we have this grp csv on server, creating grp csv for local.
+            manager.add_file(f"{prefix}_groups.csv", str(upload_dir) )
+            manager.add_file(f"{prefix}_user_group_membership.csv", str(upload_dir))
+            manager.add_file(f"{prefix}_fbt_users.csv", str(upload_dir))
+            manager.add_file(f"{prefix}_manual_users.csv", str(upload_dir))
+
+            manager.create_files()
+
+            if groups_csv.exists():
+                bck_grp_csv = backup_dir / f"groups.csv_{prefix}"
+                bck_grp_csv.touch()
+                shutil.copy2(str(groups_csv), str(bck_grp_csv))
+                skip_header(str(bck_grp_csv),str(groups_csv))
+
+            if user_group_membership_csv.exists():
+                bck_group_membership_csv = backup_dir / f"group_membership.csv_{prefix}"
+                bck_group_membership_csv.touch()
+                shutil.copy2(str(user_group_membership_csv), str(bck_group_membership_csv))
+                skip_header(str(bck_group_membership_csv),str(user_group_membership_csv))
+
+            if fbt_users_csv.exists():
+                bck_fbt_user_csv = Path(target_parent_dir) / f"fbt_users.csv.{prefix}"
+                bck_fbt_user_csv.touch()
+                shutil.copy2(str(fbt_users_csv), str(bck_fbt_user_csv))
+                skip_header(str(bck_fbt_user_csv), str(fbt_users_csv))
+
+            if manual_users_csv.exists():
+                bck_manual_users_csv = Path(target_parent_dir) / f"fbt_users.csv.{prefix}"
+                bck_manual_users_csv.touch()
+                shutil.copy2(str(manual_users_csv), str(bck_manual_users_csv))
+                skip_header(str(bck_manual_users_csv), str(manual_users_csv))
+
+        # FileWatcherExpressEnhancement Step 3 - Manual Files
+            manual_update_csv = Path(target_parent_dir) / company_name / "manual_update.csv"
+            manager.add_file("manual_update.csv", f"{target_parent_dir} / {company_name}")
+            manager.create_files()
+
+            if manual_update_csv.exists():
+                bck_manual_users_csv = Path(target_parent_dir) / f"fbt_users.csv.{prefix}"
+                bck_manual_users_csv.touch()
+                shutil.copy2(str(manual_update_csv), str(bck_manual_users_csv))
+
+            generate_add_update_csv(str(previous_manual_file), str(previous_manual_check), str(manual_update_csv))
+
+            complete_file_to_remove = upload_dir / _cmp_filenames_lst[i]
+            # Remove *_complete file
+            if complete_file_to_remove.exists():
+                complete_file_to_remove.unlink()
+                logger.info(f"[+] Removed complete file: {complete_file_to_remove}")
+            else:
+                logger.debug(f"[!] Complete file not found: {complete_file_to_remove}")
+
+            #
+            # now run the script to load the data into staging tables in the db
+            #
+            # HERE  WE NEED .SQL FILE BUT FOR TEMPORARY I USED A .PY FILE
+            allego_home = ENV.get("allego_home")
+            manager.add_file(f"setup_${company_name}.py", f"{allego_home}/conf/import/customer/{company_name}")
+            manager.add_file("import.sh",f"{allego_home}/scripts")
+            manager.create_files()
+
+            #  I CAN NOT TEST THIS .SQL IN LOCAL.
+            stage_script = Path(allego_home) / "conf/import/customer/" / company_name / f"setup_${company_name}.py"
+            # try:
+            #     # make sql executable
+            #     if make_sql_executable(sql_path=stage_script):
+            #         logger.info("SQL script is ready to execute.")
+            #     # execute
+            #     output = run_sql_script(stage_script, f"{target_parent_dir}/{company_name}")
+            #     if output:
+            #         logger.info("Script executed successfully...")
+            #     else:
+            #         logger.error("execution not return output")
+            # except Exception as e:
+            #     logger.error(f"Error in sql execution... {e}")
+
+            #
+            # now run the script to load from staging into production - run this one asynchronously
+            #
+
+            load_script = Path(allego_home) / "scripts" / "import.sh"
+            try:
+                output = run_shell_script(str(load_script), f"{company_id}")
+                if output:
+                    logger.info("import script executed successfully...")
+                else:
+                    logger.error("import sh execution not return output")
+            except Exception as e:
+                logger.error(f"Error in import.sh execution... {e}")
+            break
         i += 1
+    logger.info("cleaning files in 3 sec...")
+    time.sleep(3)
     manager.clean_up(_cmp_filenames_lst)
-
+    logger.info("cleaning done")
 
 if __name__ == "__main__":
     main()
