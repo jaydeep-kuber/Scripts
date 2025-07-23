@@ -1,15 +1,23 @@
 {
     "number_of_company": 1,
     "all_companies":[
-                {
-                    "cmp_name":"solarcity",
-                    "cmp_id":14
-                }      
+        {
+            "name":"company_1",
+            "id":14
+        },
+        {
+            "name":"company_2",
+            "id":14
+        }
     ],
     "allego_home": "/home/jay/work/scripts/AUP/home/ubuntu/allegoAdmin",
+    "source_parent_dir":"/home/jay/work/scripts/AUP/home",
+    "target_parent_dir":"/home/jay/work/scripts/AUP/home/ubuntu/allegoAdmin/workdir",
+    "python_exe": "/usr/bin/python3",
+    "channels_script_path": "/home/jay/work/scripts/AUP/home/ubuntu/allegoAdmin/scripts/channels",
+    "allegoadmin_script_path": "/home/jay/work/scripts/AUP/home/ubuntu/allegoAdmin/scripts",
+    "customer_stg_script": "/home/jay/work/scripts/AUP/home/ubuntu/allegoAdmin/conf/import/customer",
     "sleep_interval":60,
-    "source_parent_dir":"/home/jay/work/scripts/AUP/home/",
-    "target_parent_dir":"/home/jay/work/scripts/AUP/home/ubuntu/allegoAdmin/workdir/",
     "threshold":5,
     "channel_id":1,
     "location": "192.168.1.2",
