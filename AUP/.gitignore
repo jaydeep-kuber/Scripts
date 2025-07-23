@@ -1,6 +1,7 @@
 /data
 /sh
 /tools/logs
+/home
 
 *.csv
 *.txt
@@ -8,6 +9,6 @@
 *.bck
 
 *_complete
-
+backup
 *.log.*
 */log*
