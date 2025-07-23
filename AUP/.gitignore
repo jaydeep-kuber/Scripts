@@ -9,6 +9,6 @@
 *.bck
 
 *_complete
-backup
+*/backup*
 *.log.*
 */log*
