@@ -7,5 +7,7 @@
 *.log
 *.bck
 
+*_complete
+
 *.log.*
 */log*

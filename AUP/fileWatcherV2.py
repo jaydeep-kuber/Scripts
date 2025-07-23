@@ -5,7 +5,6 @@ import stat
 import os
 import shutil
 import subprocess
-import time
 from pathlib import Path
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
@@ -14,41 +13,37 @@ from logging.handlers import RotatingFileHandler
 
 ENV = {}
 
-# Global logger
+# --- Global Logger Setup ---
+# This setup is done once when the script starts.
 logger = logging.getLogger("FileWatcher")
-logger.setLevel(logging.DEBUG)  # Or INFO
-
+logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter(
-        fmt="[%(asctime)s] | %(levelname)s | %(name)s:%(lineno)d | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
-
-# consol handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-console_handler.setFormatter(formatter)
-
-if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
+    fmt="[%(asctime)s] | %(levelname)s | %(name)s:%(lineno)d | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+# Ensures we don't add handlers multiple times if this module were imported elsewhere.
+if not logger.handlers:
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.DEBUG)
+    console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
-# Store current handler so we can remove it when switching
-current_handler = None
-def setup_logging(filename: str):
-    global current_handler
 
-    # Remove existing file handler if any
-    if current_handler:
-        logger.removeHandler(current_handler)
-        current_handler.close()
+# This will hold the current file handler so we can change it per company.
+current_file_handler = None
 
-    file_handler = RotatingFileHandler(
-        filename,
-        mode='a'
-    )
+def setup_logging(log_path: Path):
+    """Sets up or switches the file handler for logging."""
+    global current_file_handler
+    if current_file_handler:
+        logger.removeHandler(current_file_handler)
+        current_file_handler.close()
+
+    # Use a rotating file handler for robustness in production.
+    file_handler = RotatingFileHandler(log_path, mode='a')
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
-    current_handler = file_handler
-
-    return logger
+    logger.addHandler(file_handler)
+    current_file_handler = file_handler
 
 class FileMapManager:
     def __init__(self, home_path: str):
@@ -80,11 +75,11 @@ class FileMapManager:
         for file , dir_path in self.file_map.items():
             file_path = dir_path / file
 
-            print(f"[DEBUG] fullpath -> {file_path}")
+            # print(f"[DEBUG] fullpath -> {file_path}")
             dir_path.mkdir(parents=True, exist_ok=True)
 
             if file_path.exists():
-                logger.info(f"[*] Existing file: {file_path}")
+                # logger.info(f"[*] Existing file: {file_path}")
                 continue
             file_path.touch()
 
@@ -342,12 +337,14 @@ def run_shell_script(script_path: str, argument: str) -> str:
     return result.stdout.strip()
 
 def main():
-    logfile_name = f"filewatcher.log.{datetime.now().strftime('%Y.%m.%d')}"
-    setup_logging(logfile_name)
     project_root = "/home/jay/work/scripts/AUP/"
+    server_home = "/home/jay/work/scripts/AUP/home/ubuntu/"
+    log_dir = Path(project_root) / server_home / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    logfile_name = f"{log_dir}/filewatcher.log.{datetime.now().strftime('%Y.%m.%d')}"
+    setup_logging(logfile_name)
 
     #--- Replicate server dir structure for local. [remove this block in dev/prod ] ---
-    server_home = "/home/jay/work/scripts/AUP/home/ubuntu/"
     # class object
     manager = FileMapManager(server_home)
 
@@ -359,10 +356,9 @@ def main():
         logger.error("Something went wrong in loading config ")
     company_names = [ name["cmp_name"] for name in ENV.get("all_companies")]
     # ["company_1", "company_2"]all_companies
-    print(company_names)
     company_ids = [ids["cmp_id"] for ids in ENV.get("all_companies", [])]
 
-    src_upload_dir_lst = [f'/home/jay/work/scripts/AUP/home/{company}/UPLOAD/' for company in company_names]
+    src_upload_dir_lst = [f'/home/jay/work/scripts/AUP/home/{company}/UPLOAD' for company in company_names]
     # ["/home/jay/work/scripts/AUP/home/company_1/UPLOAD/","/home/jay/work/scripts/AUP/home/company_2/UPLOAD/"]
 
     _cmp_filenames_lst = [f"{f}_complete" for f in company_names]
@@ -373,13 +369,9 @@ def main():
         manager.add_file(_cmp_filenames_lst[i], src_upload_dir_lst[i])
 
     # creating AUPChannelUploader.py will need later
-    manager.add_file("AUPChannelUploader.py", f"{server_home}/allegoAdmin/scripts/channels/")
+    manager.add_file("AUPChannelUploader.py", f"{server_home}allegoAdmin/scripts/channels/")
     # creating files
     manager.create_files()
-
-    # clean files
-    # manager.clean_up(['log.txt','log1.txt', 'log2.txt' ])
-
     # --- END ---
 
     # --- From this point script is starting ---
@@ -404,6 +396,10 @@ def main():
 
         company_name = company_names[i]
         company_id = company_ids[i]
+
+        logfile_per_company= f"{log_dir}/filewatcher.log.{company_name}.{datetime.now().strftime('%Y.%m.%d')}"
+        setup_logging(logfile_per_company)
+
         logger.info(f"company= {company_name}")
         logger.info(f"companyID= {company_id}")
 
@@ -438,8 +434,8 @@ def main():
             # Define Paths for Previous Files
             # --- assuming we have prev files in dev---
             # creating for local
-            manager.add_file("users.csv",f"{target_parent_dir}/{company_name}")
-            manager.add_file("manual_users.csv",f"{target_parent_dir}/{company_name}")
+            manager.add_file("users.csv",f"{target_parent_dir}{company_name}")
+            manager.add_file("manual_users.csv",f"{target_parent_dir}{company_name}")
             manager.create_files()
 
             previous_check = Path(target_parent_dir) /company_name/"users.csv"
@@ -590,24 +586,24 @@ def main():
                 skip_header(str(bck_group_membership_csv),str(user_group_membership_csv))
 
             if fbt_users_csv.exists():
-                bck_fbt_user_csv = Path(target_parent_dir) / f"fbt_users.csv.{prefix}"
+                bck_fbt_user_csv = backup_dir / f"fbt_users.csv.{prefix}"
                 bck_fbt_user_csv.touch()
                 shutil.copy2(str(fbt_users_csv), str(bck_fbt_user_csv))
                 skip_header(str(bck_fbt_user_csv), str(fbt_users_csv))
 
             if manual_users_csv.exists():
-                bck_manual_users_csv = Path(target_parent_dir) / f"fbt_users.csv.{prefix}"
+                bck_manual_users_csv = backup_dir / f"manual_users.csv.{prefix}"
                 bck_manual_users_csv.touch()
                 shutil.copy2(str(manual_users_csv), str(bck_manual_users_csv))
                 skip_header(str(bck_manual_users_csv), str(manual_users_csv))
 
         # FileWatcherExpressEnhancement Step 3 - Manual Files
             manual_update_csv = Path(target_parent_dir) / company_name / "manual_update.csv"
-            manager.add_file("manual_update.csv", f"{target_parent_dir} / {company_name}")
+            manager.add_file("manual_update.csv", f"{target_parent_dir}/{company_name}")
             manager.create_files()
 
             if manual_update_csv.exists():
-                bck_manual_users_csv = Path(target_parent_dir) / f"fbt_users.csv.{prefix}"
+                bck_manual_users_csv = backup_dir / f"manual_updats.csv.{prefix}"
                 bck_manual_users_csv.touch()
                 shutil.copy2(str(manual_update_csv), str(bck_manual_users_csv))
 
@@ -626,12 +622,12 @@ def main():
             #
             # HERE  WE NEED .SQL FILE BUT FOR TEMPORARY I USED A .PY FILE
             allego_home = ENV.get("allego_home")
-            manager.add_file(f"setup_${company_name}.py", f"{allego_home}/conf/import/customer/{company_name}")
+            manager.add_file(f"setup_{company_name}.py", f"{allego_home}/conf/import/customer/{company_name}")
             manager.add_file("import.sh",f"{allego_home}/scripts")
             manager.create_files()
 
             #  I CAN NOT TEST THIS .SQL IN LOCAL.
-            stage_script = Path(allego_home) / "conf/import/customer/" / company_name / f"setup_${company_name}.py"
+            stage_script = Path(allego_home) / "conf/import/customer/" / company_name / f"setup_{company_name}.py"
             # try:
             #     # make sql executable
             #     if make_sql_executable(sql_path=stage_script):
@@ -660,10 +656,10 @@ def main():
                 logger.error(f"Error in import.sh execution... {e}")
             break
         i += 1
-    logger.info("cleaning files in 3 sec...")
-    time.sleep(3)
-    manager.clean_up(_cmp_filenames_lst)
-    logger.info("cleaning done")
+    # logger.info("cleaning files in 3 sec...")
+    # time.sleep(3)
+    # manager.clean_up(_cmp_filenames_lst)
+    # logger.info("cleaning done")
 
 if __name__ == "__main__":
     main()
