@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
-# from py.FwLibrary import diff_checker
+from py.FwLibrary import diff_checker
 
 ENV = {}
 
@@ -507,9 +507,10 @@ def main():
                 logger.debug("Script failed:")
 
             # Check estimated differences first CASE is based on exit codes. Skip if threshold = 101
+            location = ENV.get("location")
             if threshold < 101:
-                # precent = diff_checker(previous_file, users_csv, threshold, ENV.get("threshold", 1), company_id, company_name)
-                precent =  0
+                # precent =  0 # skipping log watcher, testing purpose.
+                precent = diff_checker(previous_file, users_csv, threshold, location, company_id, company_name, logger_obj=logger)
                 if precent == 1 :
                     logger.debug("Diff Checker has stopped AUP...")
                     # Remove complete file and archive Users file when AUP fails
