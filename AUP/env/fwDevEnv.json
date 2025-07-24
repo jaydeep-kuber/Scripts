@@ -1,5 +1,5 @@
 {
-    "number_of_company": 1,
+    "log_directory": "/home/jay/work/scripts/AUP/home/ubuntu/logs",
     "all_companies":[
         {
             "name":"company_1",
@@ -17,6 +17,7 @@
     "channels_script_path": "/home/jay/work/scripts/AUP/home/ubuntu/allegoAdmin/scripts/channels",
     "allegoadmin_script_path": "/home/jay/work/scripts/AUP/home/ubuntu/allegoAdmin/scripts",
     "customer_stg_script": "/home/jay/work/scripts/AUP/home/ubuntu/allegoAdmin/conf/import/customer",
+    "mysql_cmd": "mysql CoreDB -u <user> -p <password> -h <DB-URL>",
     "sleep_interval":60,
     "threshold":5,
     "channel_id":1,
