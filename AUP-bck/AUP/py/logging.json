@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "default": {
+      "format": "%(asctime)s | %(levelname)s | %(threadName)s | %(filename)s:%(lineno)d | %(message)s"
+    },
+    "detailed": {
+      "format": "%(asctime)s | %(levelname)s | Thread:%(threadName)s | File:%(filename)s:%(lineno)d | Func:%(funcName) | %(message)s"
+    }
+  },
+  "handlers": {
+    "consol": {
+      "class": "logging.StreamHandler",
+      "level": "DEBUG",
+      "formatter": "default"
+    },
+    "file": {
+      "class": "logging.FileHandler",
+      "level": "INFO",
+      "formatter": "detailed",
+      "filename": "logs/script_logs.log",
+      "mode": "a"
+    }
+  },
+  "root": {
+    "level": "WARN",
+    "handlers": ["consol","file"]
+  },
+  "loggers": {
+    "script": {
+      "level": "INFO",
+      "handlers": ["consol", "file"],
+      "propagate": false
+    }
+  }
+}
