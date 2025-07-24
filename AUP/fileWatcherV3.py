@@ -1,5 +1,6 @@
 import json
 import logging
+import shlex
 import sys
 import stat
 import os
@@ -14,40 +15,39 @@ from logging.handlers import RotatingFileHandler
 ENV = {}
 
 # Global logger
+
+# --- Global Logger Setup ---
+# This setup is done once when the script starts.
 logger = logging.getLogger("FileWatcher")
-logger.setLevel(logging.DEBUG)  # Or INFO
-
+logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter(
-        fmt="[%(asctime)s] | %(levelname)s | %(name)s:%(lineno)d | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
-
-# consol handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-console_handler.setFormatter(formatter)
-
-if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
+    fmt="[%(asctime)s] | %(levelname)s | %(name)s:%(lineno)d | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+# Ensures we don't add handlers multiple times if this module were imported elsewhere.
+if not logger.handlers:
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.DEBUG)
+    console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
-# Store current handler so we can remove it when switching
-current_handler = None
-def setup_logging(filename: str):
-    global current_handler
 
-    # Remove existing file handler if any
-    if current_handler:
-        logger.removeHandler(current_handler)
-        current_handler.close()
+# This will hold the current file handler so we can change it per company.
+current_file_handler = None
 
-    file_handler = RotatingFileHandler(
-        filename,
-        mode='a'
-    )
+def setup_logging(log_path: str):
+    """Sets up or switches the file handler for logging."""
+    Path(log_path)
+    global current_file_handler
+    if current_file_handler:
+        logger.removeHandler(current_file_handler)
+        current_file_handler.close()
+
+    # Use a rotating file handler for robustness in production.
+    file_handler = RotatingFileHandler(log_path, maxBytes=5*1024*1024, backupCount=3, mode='a')
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
-    current_handler = file_handler
-
-    return logger
+    logger.addHandler(file_handler)
+    current_file_handler = file_handler
 
 class FileMapManager:
     def __init__(self, home_path: str):
@@ -311,6 +311,7 @@ def run_sql_script(script_path: str, argument: str) -> str:
     if not os.access(script_path, os.X_OK):
         raise PermissionError(f"Script is not executable: {script_path}")
 
+    # MYSQL_CMD = "mysql CoreDB -u <user> -p <password> -h <DB-URL>"
     result = subprocess.run(
         [str(script), argument],
         capture_output=True,
@@ -341,11 +342,14 @@ def run_shell_script(script_path: str, argument: str) -> str:
     return result.stdout.strip()
 
 def main():
-    logfile_name = f"filewatcher.log.{datetime.now().strftime('%Y.%m.%d')}"
+    logfile_root = Path("/home/jay/work/scripts/AUP/home/ubuntu/logs")
+    logfile_root.mkdir(parents=True, exist_ok=True)
+    date_time = datetime.now().strftime('%Y.%m.%d')
+    logfile_name = f"{logfile_root}/filewatcher.log.{date_time}"
     setup_logging(logfile_name)
 
     # static declaration
-    project_root = "/home/jay/work/scripts/AUP/"
+    # project_root = "/home/jay/work/scripts/AUP/"
     server_home = "/home/jay/work/scripts/AUP/home/ubuntu/"
     env_file = "./env/fwDevEnv.json"
 
@@ -404,6 +408,11 @@ def main():
     for company in all_companies:
         company_name = company['name']
         company_id = company['name']
+
+        # --- Logging per company ---
+        logfile_company = f"{logfile_root}/filewatcher.log.{company_name}.{date_time}"
+        setup_logging(logfile_company)
+
         logger.info(f"checking {company}, {datetime.now()}")
 
         upload_directory = source_root / company_name / "UPLOAD"
@@ -414,12 +423,12 @@ def main():
         for idx, _cmp_file in enumerate(upload_directory.glob("*_complete")):
             file_name = _cmp_file.name
             prefix = file_name[:-9]  # Removes last 9 characters
-            
+
             # static in loop
             channel_id = ENV.get("channel_id")
             python_exe = ENV.get("python_exe")
             script_path = ENV.get("channels_script_path")
-            
+
             users_csv = upload_directory / f"{prefix}_users.csv"
             groups_csv = upload_directory / f"{prefix}_groups.csv"
             user_group_membership_csv = upload_directory / f"{prefix}_user_group_membership.csv"
@@ -521,13 +530,13 @@ def main():
                 else:
                     logger.debug("Diff Checker has passed...")
 
-        # --- End FileWatcherExpressEnhancement Step 1 ---
+            # --- End FileWatcherExpressEnhancement Step 1 ---
 
-        # --- This is not in script but to keep in safe side, I did here ---
+            # --- This is not in script but to keep in safe side, I did here ---
             backup_dir = work_directory / "backup"
             backup_dir.mkdir(parents=True ,exist_ok=True)
             logger.info("Backup dir created in server home")
-           
+
             bck_user_csv = backup_dir / f"users.csv.{prefix}"
             bck_add_update = backup_dir / f"add_update.csv.{prefix}"
             bck_disable = backup_dir / f"disable.csv.{prefix}"
@@ -602,30 +611,56 @@ def main():
             #
             # now run the script to load the data into staging tables in the db
             #
+
             # HERE  WE NEED .SQL FILE BUT FOR TEMPORARY I USED A .PY FILE
+            mysql_cmd = ENV.get("mysql_cmd")
+            mysql_args = shlex.split(mysql_cmd)
             manager.add_file(f"setup_{company_name}.py", f"{allego_home}/conf/import/customer/{company_name}")
             manager.add_file("import.sh",f"{allego_home}/scripts")
             manager.create_files()
 
             #  I CAN NOT TEST THIS .SQL IN LOCAL.
-            # stage_script = Path(ENV.get("customer_stg_script")) / company_name / f"setup_{company_name}.py"
-            # try:
-            #     # make sql executable.
-            #     if make_sql_executable(sql_path=stage_script):
-            #         logger.info("SQL script is ready to execute.")
-            #     # execute
-            #     output = run_sql_script(stage_script, f"{work_directory}")
-            #     if output:
-            #         logger.info("Script executed successfully...")
-            #     else:
-            #         logger.error("execution not return output")
-            # except Exception as e:
-            #     logger.error(f"Error in sql execution... {e}")
+            stage_script = Path(ENV.get("customer_stg_script")) / company_name / f"setup_{company_name}.sql"
+
+            try:
+                # make sql executable.
+                if make_sql_executable(sql_path=stage_script):
+                    logger.info("SQL script is ready to execute.")
+                else:
+                    logger.warning("Problem in making .sql executable...")
+                # execute
+                try:
+                    # 1. Read all queries from the .sql file into a single string
+                    with open(stage_script, 'r') as f:
+                        sql_commands = f.read()
+
+                    # 2. Execute the mysql command, piping the file's content to it
+                    #    The `input` parameter is the key here.
+                    subprocess.run(
+                        mysql_args,
+                        input=sql_commands,
+                        text=True,  # Treat input as text
+                        check=True  # Raise an error if the command fails
+                    )
+                    logger.info(f"✅ Successfully executed {stage_script}")
+
+                except FileNotFoundError:
+                    print(f"❌ Error: The file was not found at {stage_script}")
+                except subprocess.CalledProcessError as e:
+                    print(f"❌ Error during MySQL execution: {e}")
+                except Exception as e:
+                    print(f"An unexpected error occurred: {e}")
+                #     output = run_sql_script(stage_script, f"{work_directory}")
+                # if output:
+                #     logger.info("Script executed successfully...")
+                # else:
+                #     logger.error("execution not return output")
+            except Exception as e:
+                logger.error(f"Error in sql execution... {e}")
 
             #
             # now run the script to load from staging into production - run this one asynchronously
             #
-
             load_script = Path(ENV.get("allegoadmin_script_path")) / "import.sh"
             try:
                 output = run_shell_script(str(load_script), f"{company_id}")
