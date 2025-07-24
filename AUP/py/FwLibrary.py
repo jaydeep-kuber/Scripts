@@ -1,9 +1,11 @@
-import os
 import sys
 import shutil
 import subprocess
 from pathlib import Path
 from datetime import datetime
+
+# --- global logger ---
+logger = None
 
 def send_mail(from_email, to_email, subject, body):
     region = "us-east-1"
@@ -21,9 +23,9 @@ def send_mail(from_email, to_email, subject, body):
     # Run the command silently (suppress output like >/dev/null 2>&1)
     try:
         subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print("Email sent successfully.")
+        logger.info("Email sent successfully.")
     except subprocess.CalledProcessError as e:
-        print("Failed to send email:", e)
+        logger.error("Failed to send email:", e)
 
 def set_company_on_hold(filepath, prod_config, cid):
 
@@ -31,12 +33,16 @@ def set_company_on_hold(filepath, prod_config, cid):
     cmd = [py, filepath, prod_config, cid]
     try:
         subprocess.run(cmd, check=True)
-        print("Company on hold successfully.")
+        logger.info("Company on hold successfully.")
     except subprocess.CalledProcessError as e:  
-        print(f"Exception occurred : {e}")
+        logger.error(f"Exception occurred : {e}")
     return 1       
 
-def diff_checker(prev_file, user_file, threshold, location, cid, cmp_name):
+def diff_checker(prev_file, user_file, threshold, location, cid, cmp_name, logger_obj):
+    global logger
+    if logger is None:
+        logger = logger_obj
+
     server=location
     prod_config=Path("/home/ubuntu/allegoAdmin/scripts/prod.json")
     
@@ -44,8 +50,8 @@ def diff_checker(prev_file, user_file, threshold, location, cid, cmp_name):
     temp_p = Path(f"/tmp/diff_previous_{cid}.csv") 
     temp_c = Path(f"/tmp/diff_current_{cid}.csv")
 
-    temp_p.unlink(missing_ok=True) if os.path.exists(temp_p) else None
-    temp_c.unlink(missing_ok=True) if os.path.exists(temp_c) else None
+    temp_p.unlink(missing_ok=True) if temp_p.exists() else None
+    temp_c.unlink(missing_ok=True) if temp_c.exists() else None
 
     # make empty 2 files
     temp_p.parent.mkdir(parents=True, exist_ok=True)
@@ -63,7 +69,7 @@ def diff_checker(prev_file, user_file, threshold, location, cid, cmp_name):
         subprocess.run(['dos2unix', temp_p], check=True)
         subprocess.run(['dos2unix', temp_c], check=True)
     except subprocess.CalledProcessError as e:
-        print(f"Exception in FwLib : {e}")
+        logger.error(f"Exception in FwLib : {e}")
 
     # Get number of common lines
     cmd_common = f"comm -12 <(sort {temp_p}) <(sort {temp_c}) | wc -l"
@@ -77,9 +83,9 @@ def diff_checker(prev_file, user_file, threshold, location, cid, cmp_name):
     cmd_prev = ["wc", "-l", str(temp_p)]
     diff_previous_count = int(subprocess.check_output(cmd_prev, text=True).split()[0])
 
-    print("Common rows:", diff_count)
-    print("Current file line count:", diff_current_count)
-    print("Previous file line count:", diff_previous_count)
+    logger.info("Common rows:", diff_count)
+    logger.info("Current file line count:", diff_current_count)
+    logger.info("Previous file line count:", diff_previous_count)
 
     # email headers
     from_email="From: Ad-Hoc Reports System <no-reply@allego.com>"
@@ -93,7 +99,7 @@ def diff_checker(prev_file, user_file, threshold, location, cid, cmp_name):
         case_1_body=f"Empty file Detected for Company: {cmp_name}.  Check for a 0KB file or a _complete file without any paired users file."
         send_mail(
             from_email="email-admin@allego.com",
-            to_email="jira@allego.atlassian.net",
+            to_email=to_email,
             subject= case_1_subject,
             body=case_1_body
         )
@@ -103,9 +109,9 @@ def diff_checker(prev_file, user_file, threshold, location, cid, cmp_name):
         script_file.parent.mkdir(parents=True, exist_ok=True)
         if not script_file:
             script_file.touch()
-            print("Company hold file created")
+            logger.info("Company hold file created")
         else:
-            print("Company hold file is present")
+            logger.info("Company hold file is present")
         ##################################################
         set_company_on_hold(str(script_file), prod_config,cid)
         return 1
@@ -123,7 +129,7 @@ def diff_checker(prev_file, user_file, threshold, location, cid, cmp_name):
             case_2_body=f"Possible file truncation for company {cmp_name}.  File size is significantly smaller than the last run file or is corrupted."
             send_mail(
                 from_email="email-admin@allego.com",
-                to_email="jira@allego.atlassian.net",
+                to_email=to_email,
                 subject= case_2_subject,
                 body=case_2_body
             )   
@@ -145,7 +151,7 @@ def diff_checker(prev_file, user_file, threshold, location, cid, cmp_name):
 
         send_mail(
                 from_email="email-admin@allego.com",
-                to_email="jira@allego.atlassian.net",
+                to_email=to_email,
                 subject= case_3_subject,
                 body=case_3_body
             )   
@@ -170,7 +176,7 @@ def diff_checker(prev_file, user_file, threshold, location, cid, cmp_name):
             check=True
         )
     except subprocess.CalledProcessError as e:
-        print("Failed to send email:", e)
+        logger.info("Failed to send email:", e)
         sys.exit(1)
 
     return 0
