@@ -2,6 +2,8 @@
 /sh
 /tools/logs
 /home
+../AUP-bck
+../AUPv3
 
 *.csv
 *.txt
