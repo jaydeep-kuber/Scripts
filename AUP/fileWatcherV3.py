@@ -342,6 +342,14 @@ def run_shell_script(script_path: str, argument: str) -> str:
     return result.stdout.strip()
 
 def main():
+    env_file = "./env/fwDevEnv.json"
+    # loading config to access global ENV
+    if config_loader(env_file):
+        if len(ENV) == 0:
+            exit("conf loaded... but not populated")
+    else:
+        logger.error("Something went wrong in loading config ")
+
     logfile_root = Path("/home/jay/work/scripts/AUP/home/ubuntu/logs")
     logfile_root.mkdir(parents=True, exist_ok=True)
     date_time = datetime.now().strftime('%Y.%m.%d')
@@ -351,17 +359,10 @@ def main():
     # static declaration
     # project_root = "/home/jay/work/scripts/AUP/"
     server_home = "/home/jay/work/scripts/AUP/home/ubuntu/"
-    env_file = "./env/fwDevEnv.json"
 
     # class object
     manager = FileMapManager(server_home)
 
-    # loading config to access global ENV
-    if config_loader(env_file):
-        if len(ENV) == 0:
-            exit("conf loaded... but not populated")
-    else:
-        logger.error("Something went wrong in loading config ")
 
     # static from env file
     source_root = Path(ENV["source_parent_dir"])
