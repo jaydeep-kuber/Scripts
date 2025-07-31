@@ -2,15 +2,22 @@
 /sh
 /tools/logs
 /home
-../AUP-bck
-../AUPv3
+UT/venv
+UT/logs
+
 
 *.csv
 *.txt
 *.log
 *.bck
+*.env
+.idea
 
 *_complete
 */backup*
 *.log.*
 */log*
+
+
+config.json
+__pycache__
