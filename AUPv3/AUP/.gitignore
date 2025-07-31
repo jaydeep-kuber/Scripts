@@ -1,0 +1,13 @@
+/data
+/sh
+/tools/logs
+/home
+/env
+
+*.csv
+*.txt
+*.log
+*.bck
+
+*.log.*
+*/log*

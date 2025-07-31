@@ -1,53 +1,54 @@
 import json
 import logging
-import shlex
 import sys
 import stat
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
-from py.FwLibrary import diff_checker
+# from py.FwLibrary import diff_checker
 
 ENV = {}
 
 # Global logger
-
-# --- Global Logger Setup ---
-# This setup is done once when the script starts.
 logger = logging.getLogger("FileWatcher")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.DEBUG)  # Or INFO
+
 formatter = logging.Formatter(
-    fmt="[%(asctime)s] | %(levelname)s | %(name)s:%(lineno)d | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
-# Ensures we don't add handlers multiple times if this module were imported elsewhere.
-if not logger.handlers:
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.DEBUG)
-    console_handler.setFormatter(formatter)
+        fmt="[%(asctime)s] | %(levelname)s | %(name)s:%(lineno)d | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+
+# consol handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(formatter)
+
+if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
     logger.addHandler(console_handler)
+# Store current handler so we can remove it when switching
+current_handler = None
+def setup_logging(filename: str):
+    global current_handler
 
-# This will hold the current file handler so we can change it per company.
-current_file_handler = None
+    # Remove existing file handler if any
+    if current_handler:
+        logger.removeHandler(current_handler)
+        current_handler.close()
 
-def setup_logging(log_path: str):
-    """Sets up or switches the file handler for logging."""
-    Path(log_path)
-    global current_file_handler
-    if current_file_handler:
-        logger.removeHandler(current_file_handler)
-        current_file_handler.close()
-
-    # Use a rotating file handler for robustness in production.
-    file_handler = RotatingFileHandler(log_path, maxBytes=5*1024*1024, backupCount=3, mode='a')
+    file_handler = RotatingFileHandler(
+        filename,
+        mode='a'
+    )
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    current_file_handler = file_handler
+    current_handler = file_handler
+
+    return logger
 
 class FileMapManager:
     def __init__(self, home_path: str):
@@ -311,7 +312,6 @@ def run_sql_script(script_path: str, argument: str) -> str:
     if not os.access(script_path, os.X_OK):
         raise PermissionError(f"Script is not executable: {script_path}")
 
-    # MYSQL_CMD = "mysql CoreDB -u <user> -p <password> -h <DB-URL>"
     result = subprocess.run(
         [str(script), argument],
         capture_output=True,
@@ -342,38 +342,27 @@ def run_shell_script(script_path: str, argument: str) -> str:
     return result.stdout.strip()
 
 def main():
+    logfile_name = f"filewatcher.log.{datetime.now().strftime('%Y.%m.%d')}"
+    setup_logging(logfile_name)
+    project_root = "/home/jay/work/scripts/AUP/"
+
+    #--- Replicate server dir structure for local. [remove this block in dev/prod ] ---
+    server_home = "/home/jay/work/scripts/AUP/home/ubuntu/"
+    # class object
+    manager = FileMapManager(server_home)
+
     env_file = "./env/fwDevEnv.json"
-    # loading config to access global ENV
     if config_loader(env_file):
         if len(ENV) == 0:
             exit("conf loaded... but not populated")
     else:
         logger.error("Something went wrong in loading config ")
-
-    logfile_root = Path(ENV.get("log_directory"))
-    logfile_root.mkdir(parents=True, exist_ok=True)
-    date_time = datetime.now().strftime('%Y.%m.%d')
-    logfile_name = f"{logfile_root}/filewatcher.log.{date_time}"
-    setup_logging(logfile_name)
-
-    # static declaration
-    # project_root = ""
-    server_home = ENV.get("server_home")
-
-    # class object
-    manager = FileMapManager(server_home)
-
-
-    # static from env file
-    source_root = Path(ENV["source_parent_dir"])
-    target_root = Path(ENV["target_parent_dir"])
-    allego_home = Path(ENV["allego_home"])
-
-    company_names = [ name["name"] for name in ENV.get("all_companies")]
+    company_names = [ name["cmp_name"] for name in ENV.get("all_companies")]
     # ["company_1", "company_2"]all_companies
-    # company_ids = [ids["cmp_id"] for ids in ENV.get("all_companies", [])]
-    src_parent_dir= ENV.get("source_parent_dir")
-    src_upload_directory_lst = [f'{src_parent_dir}/{company}/UPLOAD/' for company in company_names]
+    print(company_names)
+    company_ids = [ids["cmp_id"] for ids in ENV.get("all_companies", [])]
+
+    src_upload_dir_lst = [f'/home/jay/work/scripts/AUP/home/{company}/UPLOAD/' for company in company_names]
     # ["/home/jay/work/scripts/AUP/home/company_1/UPLOAD/","/home/jay/work/scripts/AUP/home/company_2/UPLOAD/"]
 
     _cmp_filenames_lst = [f"{f}_complete" for f in company_names]
@@ -381,10 +370,16 @@ def main():
 
     # adding all these file to file map {filename,abs_path}
     for i, name in enumerate(company_names):
-        manager.add_file(_cmp_filenames_lst[i], src_upload_directory_lst[i])
+        manager.add_file(_cmp_filenames_lst[i], src_upload_dir_lst[i])
 
+    # creating AUPChannelUploader.py will need later
+    manager.add_file("AUPChannelUploader.py", f"{server_home}/allegoAdmin/scripts/channels/")
     # creating files
     manager.create_files()
+
+    # clean files
+    # manager.clean_up(['log.txt','log1.txt', 'log2.txt' ])
+
     # --- END ---
 
     # --- From this point script is starting ---
@@ -401,50 +396,27 @@ def main():
     # getting threshold value form.
     threshold = ENV.get('threshold') or 101
     logger.debug(f"Threshold is set to: {threshold}")
-    
-    # --- replaced while with for loop ---
-    all_companies = ENV["all_companies"]
-    for company in all_companies:
-        company_name = company['name']
-        company_id = company['name']
 
-        # --- Logging per company ---
-        logfile_company = f"{logfile_root}/filewatcher.log.{company_name}.{date_time}"
-        setup_logging(logfile_company)
+    # --- while loop ---
+    i = 0
+    while i < ENV.get("number_of_company"):
+        logger.info(f"checking {i}, {datetime.now()}")
 
-        logger.info(f"checking {company}, {datetime.now()}")
-
-        upload_directory = source_root / company_name / "UPLOAD"
-        work_directory = Path(f"{target_root}/{company_name}")
-
+        company_name = company_names[i]
+        company_id = company_ids[i]
         logger.info(f"company= {company_name}")
         logger.info(f"companyID= {company_id}")
-        for idx, _cmp_file in enumerate(upload_directory.glob("*_complete")):
+
+        # number of company and company in list are same?
+        logger.warning("value of 'number_of_company' attribute and number of company resent in list are not same ") if ENV.get("number_of_company") != len(company_names) else None
+
+        # --- for loop ---
+        upload_dir = Path(src_upload_dir_lst[i])
+        for idx, _cmp_file in enumerate(upload_dir.glob("*_complete")):
             file_name = _cmp_file.name
             prefix = file_name[:-9]  # Removes last 9 characters
-
-            # static in loop
-            channel_id = ENV.get("channel_id")
-            python_exe = ENV.get("python_exe")
-            script_path = ENV.get("channels_script_path")
-
-            users_csv = upload_directory / f"{prefix}_users.csv"
-            groups_csv = upload_directory / f"{prefix}_groups.csv"
-            user_group_membership_csv = upload_directory / f"{prefix}_user_group_membership.csv"
-            fbt_users_csv = upload_directory / f"{prefix}_fbt_users.csv"  # sunovion Legacy implementation
-            manual_users_csv = upload_directory / f"{prefix}_manual_users.csv"  # Manual File Support
-
-            aup_failure_archive_path = target_root / "aupFailureArchive" / f"{prefix}_{company_name}"
-            manager.add_file("AUPChannelUploader.py", f"{script_path}")
-            manager.add_file("add_update.csv", f"{work_directory}")
-            manager.add_file("disable.csv", f"{work_directory}")
-            manager.add_file("users.csv", f"{work_directory}")
-            manager.add_file("manual_users.csv", f"{work_directory}")
-            manager.add_file(f"{prefix}_groups.csv", str(upload_directory))
-            manager.add_file(f"{prefix}_user_group_membership.csv", str(upload_directory))
-            manager.add_file(f"{prefix}_fbt_users.csv", str(upload_directory))
-            manager.add_file(f"{prefix}_manual_users.csv", str(upload_directory))
-            manager.add_file(f"{prefix}_users.csv", str(upload_directory))
+            users_csv = upload_dir / f"{prefix}_users.csv"
+            manager.add_file( f"{prefix}_users.csv", str(upload_dir) )
             manager.create_files()
 
             # --- utf8 ---
@@ -459,15 +431,26 @@ def main():
                     logger.info(f"[INFO] Skipping UTF-8 check for company ID: {company_id}")
 
             # --- FileWatcherExpressEnhancement Step 1 ---
-            previous_check = Path(work_directory) /"users.csv"
-            previous_manual_check = Path(work_directory) /"manual_users.csv"
+            target_parent_dir = ENV.get("target_parent_dir", ".")
+            Path(target_parent_dir)
+            channel_id = ENV.get("channel_id")
+
+            # Define Paths for Previous Files
+            # --- assuming we have prev files in dev---
+            # creating for local
+            manager.add_file("users.csv",f"{target_parent_dir}/{company_name}")
+            manager.add_file("manual_users.csv",f"{target_parent_dir}/{company_name}")
+            manager.create_files()
+
+            previous_check = Path(target_parent_dir) /company_name/"users.csv"
+            previous_manual_check = Path(target_parent_dir)/company_name/"manual_users.csv"
 
             if len(sys.argv) > 2 and sys.argv[2].lower() == "legacy":
                 logger.debug("Running Legacy Version with full file")
                 # Legacy runs as manual; override Threshold
                 threshold = 101
-                previous_check = Path(work_directory) / "users.csv"
-                previous_manual_check = Path(work_directory) /"manual_users.csv"
+                previous_check = Path(target_parent_dir) / company_name / "users.csv"
+                previous_manual_check = Path(target_parent_dir) /company_name/"manual_users.csv"
                 previous_check.touch()
                 previous_manual_check.touch()
             else:
@@ -485,16 +468,25 @@ def main():
 
             # Copy previous users.csv (or blank one you just touched, or blank one you forced in there), as previous.csv
             # Copy previous manual_users.csv (or blank one you just touched, or blank one you forced in there), as manual_previous.csv
-            previous_file = Path(work_directory) / "previous.csv"
-            previous_manual_file = Path(work_directory) / "manual_previous.csv"
+            previous_file = Path(target_parent_dir) / company_name / "previous.csv"
+            previous_manual_file = Path(target_parent_dir) / company_name / "manual_previous.csv"
+
+            # --- assuming it is present ---
+            # but creating previous file for local
+            # previous_file.touch() if not previous_file.exists() else logger.log(f"Previous file Exist... at {previous_file}")
+            # previous_manual_file.touch() if not previous_manual_file.exists() else logger.log(f"Previous manual file Exist... at {previous_manual_file}")
 
             shutil.copy2(previous_check, previous_file)
             shutil.copy2(previous_manual_check, previous_manual_file)
 
-            script_file = f"{script_path}/AUPChannelUploader.py"
+            # Upload file to channel in AUP Company
+            python_exe = "/usr/bin/python3"
+            script_path = f"{project_root}/home/ubuntu/allegoAdmin/scripts/channels/AUPChannelUploader.py"
+            # users_csv = Path(f"/UPLOAD/{company_name}/{company_name}_complete")
+
             # Run command
             result = subprocess.run(
-                [python_exe, script_file, str(channel_id), str(users_csv)],
+                [python_exe, script_path, str(channel_id), str(users_csv)],
                 capture_output=True,
                 text=True,
             )
@@ -502,26 +494,28 @@ def main():
             # Check result
             if result.returncode == 0:
                 logger.debug("Script executed successfully:")
+                # print(result.stdout)
             else:
                 logger.debug("Script failed:")
+                # print(result.stderr)
 
             # Check estimated differences first CASE is based on exit codes. Skip if threshold = 101
-            location = ENV.get("location")
             if threshold < 101:
-                # precent =  0 # skipping log watcher, testing purpose.
-                precent = diff_checker(previous_file, users_csv, threshold, location, company_id, company_name, logger_obj=logger)
+                # precent = diff_checker(previous_file, users_csv, threshold, ENV.get("threshold", 1), company_id, company_name)
+                precent =  0
                 if precent == 1 :
                     logger.debug("Diff Checker has stopped AUP...")
                     # Remove complete file and archive Users file when AUP fails
 
                     # 1. Remove *_complete files
-                    for file in upload_directory.glob("*_complete"):
+                    for file in upload_dir.glob("*_complete"):
                         try:
                             file.unlink()
                         except Exception as e:
                             logger.error(f"Failed to delete {file}: {e}")
 
                     # 2. Move users_csv to failure archive with prefix
+                    aup_failure_archive_path = Path(target_parent_dir) / "aupFailureArchive" / f"{prefix}_{company_name}"
                     try:
                         shutil.move(str(users_csv), str(aup_failure_archive_path))
                     except Exception as e:
@@ -530,32 +524,33 @@ def main():
                 else:
                     logger.debug("Diff Checker has passed...")
 
-            # --- End FileWatcherExpressEnhancement Step 1 ---
+        # --- End FileWatcherExpressEnhancement Step 1 ---
 
-            # --- This is not in script but to keep in safe side, I did here ---
-            backup_dir = work_directory / "backup"
+        # --- This is not in script but to keep in safe side, I did here ---
+            backup_dir = Path(server_home) / "backup"
             backup_dir.mkdir(parents=True ,exist_ok=True)
+            backup_csv = backup_dir / f"users.csv.{prefix}"
+
             logger.info("Backup dir created in server home")
 
-            bck_user_csv = backup_dir / f"users.csv.{prefix}"
-            bck_add_update = backup_dir / f"add_update.csv.{prefix}"
-            bck_disable = backup_dir / f"disable.csv.{prefix}"
-            bck_grp_csv = backup_dir / f"groups.csv_{prefix}"
-            bck_group_membership_csv = backup_dir / f"group_membership.csv_{prefix}"
-            bck_fbt_user_csv = backup_dir / f"fbt_users.csv.{prefix}"
-            bck_manual_users_csv = backup_dir / f"fbt_users.csv.{prefix}"
-
             if users_csv.exists():
-                bck_user_csv.touch()
-                shutil.copy2(str(users_csv), str(bck_user_csv))
+                backup_csv.touch()
+                shutil.copy2(str(users_csv), str(backup_csv))
                 logger.info("user csv copied to backup folder.")
-
-                skip_header(str(bck_user_csv), f"{work_directory}/users.csv" )
-                dos2unix(f"{work_directory}/users.csv")
+                skip_header(str(backup_csv), f"{target_parent_dir}/{company_name}/users.csv" )
+                dos2unix(f"{target_parent_dir}/{company_name}/users.csv")
 
             # --- FileWatcherExpressEnhancement Step 2 ---
-            add_update_csv = work_directory / "add_update.csv"
-            disable_csv = work_directory / "disable.csv"
+
+            manager.add_file("add_update.csv", f"{target_parent_dir}/{company_name}/" )
+            manager.add_file("disable.csv", f"{target_parent_dir}/{company_name}/" )
+            manager.create_files()
+
+            add_update_csv = Path(target_parent_dir) / company_name / "add_update.csv"
+            disable_csv = Path(target_parent_dir) / company_name / "disable.csv"
+
+            bck_add_update = backup_dir / f"add_update.csv.{prefix}"
+            bck_disable = backup_dir / f"disable.csv.{prefix}"
 
             if add_update_csv.exists():
                 shutil.copy2(add_update_csv, bck_add_update)
@@ -564,44 +559,62 @@ def main():
                 shutil.copy2(disable_csv, bck_disable)
                 logger.info("disable csv copied to backup")
 
-            generate_add_update_csv(str(previous_file), f"{work_directory}/users.csv",str(add_update_csv))
-            generate_disable_file(str(previous_file),f"{work_directory}/users.csv", str(disable_csv) )
-            # --- End FileWatcherExpressEnhancement Step 2 ---
+            generate_add_update_csv(str(previous_file), f"{target_parent_dir}/{company_name}/users.csv",str(add_update_csv))
+            generate_disable_file(str(previous_file),f"{target_parent_dir}/{company_name}/users.csv", str(disable_csv) )
+        # --- End FileWatcherExpressEnhancement Step 2 ---
+        # Older implementation of groups.csb and userGroupMemberShip.csv
 
-            # Older implementation of groups.csb and userGroupMemberShip.csv
+            groups_csv = Path(upload_dir) / f"{prefix}_groups.csv"
+            user_group_membership_csv = Path(upload_dir) / f"{prefix}_user_group_membership.csv"
+            fbt_users_csv= Path(upload_dir) / f"{prefix}_fbt_users.csv" # sunovion Legacy implementation
+            manual_users_csv = upload_dir / f"{prefix}_manual_users.csv"  # Manual File Support
+
+            # Assuming we have this grp csv on server, creating grp csv for local.
+            manager.add_file(f"{prefix}_groups.csv", str(upload_dir) )
+            manager.add_file(f"{prefix}_user_group_membership.csv", str(upload_dir))
+            manager.add_file(f"{prefix}_fbt_users.csv", str(upload_dir))
+            manager.add_file(f"{prefix}_manual_users.csv", str(upload_dir))
+
+            manager.create_files()
+
             if groups_csv.exists():
+                bck_grp_csv = backup_dir / f"groups.csv_{prefix}"
                 bck_grp_csv.touch()
                 shutil.copy2(str(groups_csv), str(bck_grp_csv))
                 skip_header(str(bck_grp_csv),str(groups_csv))
 
             if user_group_membership_csv.exists():
+                bck_group_membership_csv = backup_dir / f"group_membership.csv_{prefix}"
                 bck_group_membership_csv.touch()
                 shutil.copy2(str(user_group_membership_csv), str(bck_group_membership_csv))
                 skip_header(str(bck_group_membership_csv),str(user_group_membership_csv))
 
             if fbt_users_csv.exists():
+                bck_fbt_user_csv = Path(target_parent_dir) / f"fbt_users.csv.{prefix}"
                 bck_fbt_user_csv.touch()
                 shutil.copy2(str(fbt_users_csv), str(bck_fbt_user_csv))
                 skip_header(str(bck_fbt_user_csv), str(fbt_users_csv))
 
             if manual_users_csv.exists():
+                bck_manual_users_csv = Path(target_parent_dir) / f"fbt_users.csv.{prefix}"
                 bck_manual_users_csv.touch()
                 shutil.copy2(str(manual_users_csv), str(bck_manual_users_csv))
                 skip_header(str(bck_manual_users_csv), str(manual_users_csv))
 
-            # FileWatcherExpressEnhancement Step 3 - Manual Files
-            manual_update_csv = Path(work_directory) / "manual_update.csv"
-            manager.add_file("manual_update.csv", f"{work_directory}")
+        # FileWatcherExpressEnhancement Step 3 - Manual Files
+            manual_update_csv = Path(target_parent_dir) / company_name / "manual_update.csv"
+            manager.add_file("manual_update.csv", f"{target_parent_dir} / {company_name}")
             manager.create_files()
 
             if manual_update_csv.exists():
+                bck_manual_users_csv = Path(target_parent_dir) / f"fbt_users.csv.{prefix}"
                 bck_manual_users_csv.touch()
                 shutil.copy2(str(manual_update_csv), str(bck_manual_users_csv))
 
             generate_add_update_csv(str(previous_manual_file), str(previous_manual_check), str(manual_update_csv))
 
+            complete_file_to_remove = upload_dir / _cmp_filenames_lst[i]
             # Remove *_complete file
-            complete_file_to_remove = upload_directory / company_name
             if complete_file_to_remove.exists():
                 complete_file_to_remove.unlink()
                 logger.info(f"[+] Removed complete file: {complete_file_to_remove}")
@@ -611,57 +624,32 @@ def main():
             #
             # now run the script to load the data into staging tables in the db
             #
-
             # HERE  WE NEED .SQL FILE BUT FOR TEMPORARY I USED A .PY FILE
-            mysql_cmd = ENV.get("mysql_cmd")
-            mysql_args = shlex.split(mysql_cmd)
-            manager.add_file(f"setup_{company_name}.py", f"{allego_home}/conf/import/customer/{company_name}")
+            allego_home = ENV.get("allego_home")
+            manager.add_file(f"setup_${company_name}.py", f"{allego_home}/conf/import/customer/{company_name}")
             manager.add_file("import.sh",f"{allego_home}/scripts")
             manager.create_files()
 
             #  I CAN NOT TEST THIS .SQL IN LOCAL.
-            stage_script = Path(ENV.get("customer_stg_script")) / company_name / f"setup_{company_name}.sql"
-
-            try:
-                # make sql executable.
-                if make_sql_executable(sql_path=stage_script):
-                    logger.info("SQL script is ready to execute.")
-                else:
-                    logger.warning("Problem in making .sql executable...")
-                # execute
-                try:
-                    # 1. Read all queries from the .sql file into a single string
-                    with open(stage_script, 'r') as f:
-                        sql_commands = f.read()
-
-                    # 2. Execute the mysql command, piping the file's content to it
-                    #    The `input` parameter is the key here.
-                    subprocess.run(
-                        mysql_args,
-                        input=sql_commands,
-                        text=True,  # Treat input as text
-                        check=True  # Raise an error if the command fails
-                    )
-                    logger.info(f"✅ Successfully executed {stage_script}")
-
-                except FileNotFoundError:
-                    print(f"❌ Error: The file was not found at {stage_script}")
-                except subprocess.CalledProcessError as e:
-                    print(f"❌ Error during MySQL execution: {e}")
-                except Exception as e:
-                    print(f"An unexpected error occurred: {e}")
-                #     output = run_sql_script(stage_script, f"{work_directory}")
-                # if output:
-                #     logger.info("Script executed successfully...")
-                # else:
-                #     logger.error("execution not return output")
-            except Exception as e:
-                logger.error(f"Error in sql execution... {e}")
+            stage_script = Path(allego_home) / "conf/import/customer/" / company_name / f"setup_${company_name}.py"
+            # try:
+            #     # make sql executable
+            #     if make_sql_executable(sql_path=stage_script):
+            #         logger.info("SQL script is ready to execute.")
+            #     # execute
+            #     output = run_sql_script(stage_script, f"{target_parent_dir}/{company_name}")
+            #     if output:
+            #         logger.info("Script executed successfully...")
+            #     else:
+            #         logger.error("execution not return output")
+            # except Exception as e:
+            #     logger.error(f"Error in sql execution... {e}")
 
             #
             # now run the script to load from staging into production - run this one asynchronously
             #
-            load_script = Path(ENV.get("allegoadmin_script_path")) / "import.sh"
+
+            load_script = Path(allego_home) / "scripts" / "import.sh"
             try:
                 output = run_shell_script(str(load_script), f"{company_id}")
                 if output:
@@ -670,7 +658,12 @@ def main():
                     logger.error("import sh execution not return output")
             except Exception as e:
                 logger.error(f"Error in import.sh execution... {e}")
-        logger.info(f"checked for {company}, {datetime.now()}")
+            break
+        i += 1
+    logger.info("cleaning files in 3 sec...")
+    time.sleep(3)
+    manager.clean_up(_cmp_filenames_lst)
+    logger.info("cleaning done")
 
 if __name__ == "__main__":
     main()

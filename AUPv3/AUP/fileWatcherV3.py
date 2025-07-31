@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
-from py.FwLibrary import diff_checker
+# from py.FwLibrary import diff_checker
 
 ENV = {}
 
@@ -342,27 +342,26 @@ def run_shell_script(script_path: str, argument: str) -> str:
     return result.stdout.strip()
 
 def main():
-    env_file = "./env/fwDevEnv.json"
-    # loading config to access global ENV
-    if config_loader(env_file):
-        if len(ENV) == 0:
-            exit("conf loaded... but not populated")
-    else:
-        logger.error("Something went wrong in loading config ")
-
-    logfile_root = Path(ENV.get("log_directory"))
+    logfile_root = Path("/home/jay/work/scripts/AUP/home/ubuntu/logs")
     logfile_root.mkdir(parents=True, exist_ok=True)
     date_time = datetime.now().strftime('%Y.%m.%d')
     logfile_name = f"{logfile_root}/filewatcher.log.{date_time}"
     setup_logging(logfile_name)
 
     # static declaration
-    # project_root = ""
-    server_home = ENV.get("server_home")
+    # project_root = "/home/jay/work/scripts/AUP/"
+    server_home = "/home/jay/work/scripts/AUP/home/ubuntu/"
+    env_file = "./env/fwDevEnv.json"
 
     # class object
     manager = FileMapManager(server_home)
 
+    # loading config to access global ENV
+    if config_loader(env_file):
+        if len(ENV) == 0:
+            exit("conf loaded... but not populated")
+    else:
+        logger.error("Something went wrong in loading config ")
 
     # static from env file
     source_root = Path(ENV["source_parent_dir"])
@@ -372,8 +371,8 @@ def main():
     company_names = [ name["name"] for name in ENV.get("all_companies")]
     # ["company_1", "company_2"]all_companies
     # company_ids = [ids["cmp_id"] for ids in ENV.get("all_companies", [])]
-    src_parent_dir= ENV.get("source_parent_dir")
-    src_upload_directory_lst = [f'{src_parent_dir}/{company}/UPLOAD/' for company in company_names]
+
+    src_upload_directory_lst = [f'/home/jay/work/scripts/AUP/home/{company}/UPLOAD/' for company in company_names]
     # ["/home/jay/work/scripts/AUP/home/company_1/UPLOAD/","/home/jay/work/scripts/AUP/home/company_2/UPLOAD/"]
 
     _cmp_filenames_lst = [f"{f}_complete" for f in company_names]
@@ -383,6 +382,8 @@ def main():
     for i, name in enumerate(company_names):
         manager.add_file(_cmp_filenames_lst[i], src_upload_directory_lst[i])
 
+    # adding AUPChannelUploader.py will need later
+    manager.add_file("AUPChannelUploader.py", f"{server_home}/allegoAdmin/scripts/channels/")
     # creating files
     manager.create_files()
     # --- END ---
@@ -435,7 +436,7 @@ def main():
             manual_users_csv = upload_directory / f"{prefix}_manual_users.csv"  # Manual File Support
 
             aup_failure_archive_path = target_root / "aupFailureArchive" / f"{prefix}_{company_name}"
-            manager.add_file("AUPChannelUploader.py", f"{script_path}")
+
             manager.add_file("add_update.csv", f"{work_directory}")
             manager.add_file("disable.csv", f"{work_directory}")
             manager.add_file("users.csv", f"{work_directory}")
@@ -506,10 +507,9 @@ def main():
                 logger.debug("Script failed:")
 
             # Check estimated differences first CASE is based on exit codes. Skip if threshold = 101
-            location = ENV.get("location")
             if threshold < 101:
-                # precent =  0 # skipping log watcher, testing purpose.
-                precent = diff_checker(previous_file, users_csv, threshold, location, company_id, company_name, logger_obj=logger)
+                # precent = diff_checker(previous_file, users_csv, threshold, ENV.get("threshold", 1), company_id, company_name)
+                precent =  0
                 if precent == 1 :
                     logger.debug("Diff Checker has stopped AUP...")
                     # Remove complete file and archive Users file when AUP fails

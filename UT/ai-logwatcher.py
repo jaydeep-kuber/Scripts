@@ -7,8 +7,6 @@ import json
 import logging
 import threading
 import subprocess
-from typing import AnyStr
-
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from logging.config import dictConfig
@@ -20,6 +18,7 @@ COOLDOWN = 120 # Default cooldown in seconds to prevent excessive notifications
 EMAIL_SENDER = ""
 EMAIL_APP_PASS = ""
 EMAIL_RECIPIENTS = ""
+
 # --- Regex Patterns ---
 # Timestamp pattern for lines that start with a date and time
 TIMESTAMP_RE = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}')
@@ -84,8 +83,8 @@ class LogMonitor:
         Sends an email notification using SMTP.
         This function is a placeholder for actual email sending logic.
         """
-            # if self.cooldown_active:
-            #     return
+        if self.cooldown_active:
+            return
         subject = "Logwatcher Alert: Error Detected"
         to = ','.join(EMAIL_RECIPIENTS)  # Join multiple recipients with commas
         
@@ -139,7 +138,7 @@ class LogMonitor:
             try:
                 # Get a message from the queue with a timeout to allow the thread to be stopped
                 error_message = self.error_queue.get(timeout=1)
-                self.logger.info(f"Processing error from queue (Q size: {self.error_queue.qsize()}): {error_message[:20]}...")
+                self.logger.info(f"Processing error from queue (Q size: {self.error_queue.qsize()}): {error_message[10:40]}...")
                 self._send_smtp_notification(error_message)
                 self.error_queue.task_done() # Mark the task as done
             except queue.Empty:
@@ -232,7 +231,7 @@ class LogMonitor:
         if self.file_states[filepath]['collecting'] and self.file_states[filepath]['buffer']:
             full_error_message = "\n".join(self.file_states[filepath]['buffer'])
             self.error_queue.put(full_error_message)
-            self.logger.info(f"Enqueued error block (length {len(full_error_message)}): {full_error_message[:50]}...")
+            self.logger.info(f"Enqueued error-block length is {len(full_error_message)}: {full_error_message[20:50]}...")
             # Reset buffer and collecting state after enqueueing
             self.file_states[filepath]['buffer'] = []
             self.file_states[filepath]['collecting'] = False

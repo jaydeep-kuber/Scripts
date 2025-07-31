@@ -16,6 +16,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from logging.config import dictConfig
 
+LOG_FILES = ""
 # --- File tracking ---
 """
     A dictionary to remember the last position (offset) for each log file.
@@ -143,9 +144,7 @@ def config_loader(path):
     with open(path, 'r') as f:
         configs = json.load(f)
     
-    global REGION, TOPIC_ARN, LOG_FILES
-    REGION = configs['REGION']
-    TOPIC_ARN = configs['TOPIC_ARN']
+    global LOG_FILES
     LOG_FILES = configs['LOG_FILES']
 
     return True
@@ -175,7 +174,7 @@ if __name__ == "__main__":
     if config_loader(config_path):
         # sqs client
         # sqs = boto3.client('sqs', region_name=REGION)    
-        sns = boto3.client('sns', region_name=REGION)
+        # sns = boto3.client('sns', region_name=REGION)
         logger.error("Failed to create SNS client...") if not sns else logger.info("SNS client created successfully.")
         start_monitoring()
     else:
