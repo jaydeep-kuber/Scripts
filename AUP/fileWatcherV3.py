@@ -650,11 +650,6 @@ def main():
                     print(f"❌ Error during MySQL execution: {e}")
                 except Exception as e:
                     print(f"An unexpected error occurred: {e}")
-                #     output = run_sql_script(stage_script, f"{work_directory}")
-                # if output:
-                #     logger.info("Script executed successfully...")
-                # else:
-                #     logger.error("execution not return output")
             except Exception as e:
                 logger.error(f"Error in sql execution... {e}")
 

@@ -102,13 +102,13 @@ def print_loop(upload_dir: Path, archive_dir: Path, company: str):
 
 
 def main(company: str, key: str, passphrase: str):
-    upload_dir = Path(f"/home/jay/work/scripts/AUP/home/{company}/UPLOAD")
+    upload_dir = Path(f"/home/{company}/UPLOAD")
     sys.exit(f"{upload_dir} : is not exist") if not upload_dir.exists() else print(
         f"Working for files inside-> {upload_dir} ")
     if not upload_dir.is_absolute():
         sys.exit("Upload dir path must be absolute")
 
-    archive_dir = Path(f"/home/jay/work/scripts/AUP/home/{company}/archive")
+    archive_dir = Path(f"/home/{company}/archive")
     sys.exit(f"{archive_dir} : is not exist") if not archive_dir.exists() else print(
         f"Archive Directory -> {archive_dir} ")
     if not archive_dir.is_absolute():
