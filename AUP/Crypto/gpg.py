@@ -73,7 +73,7 @@ def print_loop(upload_dir: Path, archive_dir: Path, company: str):
         company: company name which is being processing.
     """
 
-    print("--- THI IS PRINT LOOP --- ")
+    print("--- THIS IS PRINT LOOP --- ")
     pattern = "*_complete"
 
     # looping over UPLOAD dir and matching pattern
