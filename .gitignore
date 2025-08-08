@@ -1,17 +1,28 @@
-/data
-/sh
-/tools/logs
-/home
-UT/venv
+# AUP
+AUP/.idea
+AUP/home
+AUP/data
+AUP/env
+AUP/sh
+AUP/*.txt
+AUP/tools/logs
+
+# UT
+UT/.idea
 UT/logs
+UT/venv
+
+UT/.env
+UT/*.txt
 
 
+# others
 *.csv
 *.txt
 *.log
 *.bck
 *.env
-.idea
+
 
 *_complete
 */backup*
