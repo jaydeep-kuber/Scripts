@@ -7,6 +7,8 @@ AUP/sh
 AUP/*.txt
 AUP/tools/logs
 AUP/py/home
+AUP/py/__*
+
 # UT
 UT/.idea
 UT/logs
