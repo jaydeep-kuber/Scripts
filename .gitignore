@@ -7,7 +7,6 @@ AUP/sh
 AUP/*.txt
 AUP/tools/logs
 AUP/py/home
-AUP/py/__pycache__/*
 
 # UT
 UT/.idea
@@ -24,12 +23,3 @@ UT/*.txt
 *.log
 *.bck
 *.env
-
-
-*_complete
-*/backup*
-*.log.*
-*/log*
-
-config.json
-__pycache__
