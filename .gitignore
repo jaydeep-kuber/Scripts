@@ -1,16 +1,35 @@
-/data
-/sh
-/tools/logs
-/home
-../AUP-bck
-../AUPv3
+# AUP
+AUP/.idea
+AUP/home
+AUP/data
+AUP/env
+AUP/sh
+AUP/*.txt
+AUP/tools/logs
+AUP/py/home
+AUP/py/__pycache__/*
 
+# UT
+UT/.idea
+UT/logs
+UT/venv
+
+UT/.env
+UT/*.txt
+
+
+# others
 *.csv
 *.txt
 *.log
 *.bck
+*.env
+
 
 *_complete
 */backup*
 *.log.*
 */log*
+
+config.json
+__pycache__
